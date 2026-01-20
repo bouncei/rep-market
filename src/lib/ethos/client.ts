@@ -75,6 +75,56 @@ export class EthosClient {
     }
   }
 
+  async getProfileByTwitterUsername(username: string): Promise<EthosProfile | null> {
+    try {
+      const userKey = `service:x.com:username:${username}`;
+      const profile = await this.fetch<EthosProfile>(
+        `/v1/user/by/address/${encodeURIComponent(userKey)}`
+      );
+      return profile;
+    } catch {
+      return null;
+    }
+  }
+
+  async getProfileByTwitterId(twitterId: string): Promise<EthosProfile | null> {
+    try {
+      const userKey = `service:x.com:${twitterId}`;
+      const profile = await this.fetch<EthosProfile>(
+        `/v1/user/by/address/${encodeURIComponent(userKey)}`
+      );
+      return profile;
+    } catch {
+      return null;
+    }
+  }
+
+  async getCredibilityBySocialId(
+    platform: 'x.com', 
+    identifier: string,
+    identifierType: 'id' | 'username' = 'username'
+  ): Promise<EthosCredibility | null> {
+    try {
+      let profile: EthosProfile | null = null;
+      
+      if (platform === 'x.com' && identifierType === 'username') {
+        profile = await this.getProfileByTwitterUsername(identifier);
+      } else if (platform === 'x.com' && identifierType === 'id') {
+        profile = await this.getProfileByTwitterId(identifier);
+      }
+
+      if (!profile) return null;
+
+      return {
+        score: profile.score,
+        credibility: profile.credibility,
+        profileId: profile.id,
+      };
+    } catch {
+      return null;
+    }
+  }
+
   async getProfileCount(): Promise<number> {
     try {
       const response = await this.fetch<{ count: number }>("/v1/stats/profiles");

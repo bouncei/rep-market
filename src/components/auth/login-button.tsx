@@ -36,7 +36,7 @@ export function LoginButton({
       onClick={login}
       className={className}
     >
-      Connect Wallet
+      Sign In
     </Button>
   );
 }

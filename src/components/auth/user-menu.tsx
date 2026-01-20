@@ -17,15 +17,33 @@ import { LogOut, User, Wallet, RefreshCw, LayoutDashboard } from "lucide-react";
 import Link from "next/link";
 
 export function UserMenu() {
-  const { isAuthenticated, walletAddress, profile, logout, syncCredibility, isSyncingCredibility } =
+  const { isAuthenticated, user, walletAddress, profile, logout, syncCredibility, isSyncingCredibility } =
     useAuth();
   const { tier } = useCredibility(profile?.ethosCredibility ?? 0, profile?.tier);
 
-  if (!isAuthenticated || !walletAddress) {
+  if (!isAuthenticated) {
     return null;
   }
 
-  const shortAddress = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+  // Get display info based on auth method
+  let displayName = "";
+  let shortIdentifier = "";
+  let isWalletUser = false;
+
+  if (walletAddress) {
+    displayName = "Wallet";
+    shortIdentifier = `${walletAddress.slice(0, 6)}...${walletAddress.slice(-4)}`;
+    isWalletUser = true;
+  } else if (user?.google?.email) {
+    displayName = "Google";
+    shortIdentifier = user.google.email;
+  } else if (user?.twitter?.username) {
+    displayName = "Twitter";
+    shortIdentifier = `@${user.twitter.username}`;
+  } else {
+    displayName = "User";
+    shortIdentifier = "Unknown";
+  }
 
   return (
     <DropdownMenu>
@@ -33,11 +51,13 @@ export function UserMenu() {
         <Button variant="ghost" className="flex items-center gap-2 px-2">
           <Avatar className="h-8 w-8">
             <AvatarFallback className="text-xs">
-              {walletAddress.slice(2, 4).toUpperCase()}
+              {isWalletUser ? walletAddress!.slice(2, 4).toUpperCase() :
+               user?.google?.email?.slice(0, 2).toUpperCase() ||
+               user?.twitter?.username?.slice(0, 2).toUpperCase() || "??"}
             </AvatarFallback>
           </Avatar>
-          <span className="hidden sm:inline-block font-mono text-sm">
-            {shortAddress}
+          <span className="hidden sm:inline-block font-mono text-sm max-w-32 truncate">
+            {shortIdentifier}
           </span>
           <Badge className={`${tier.bgColor} ${tier.color} ${tier.borderColor} hidden sm:inline-flex`}>
             {tier.displayName}
@@ -47,9 +67,9 @@ export function UserMenu() {
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">Connected</p>
+            <p className="text-sm font-medium leading-none">{displayName} Account</p>
             <p className="text-xs leading-none text-muted-foreground font-mono">
-              {shortAddress}
+              {shortIdentifier}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -89,22 +109,28 @@ export function UserMenu() {
           className="cursor-pointer"
         >
           <RefreshCw className={`mr-2 h-4 w-4 ${isSyncingCredibility ? "animate-spin" : ""}`} />
-          <span>Sync Credibility</span>
+          <span>
+            {isWalletUser ? "Sync Ethos (Wallet)" : 
+             user?.twitter ? "Sync Ethos (Twitter)" : 
+             "Sync Credibility"}
+          </span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
 
-        <DropdownMenuItem asChild>
-          <a
-            href={`https://etherscan.io/address/${walletAddress}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="cursor-pointer"
-          >
-            <Wallet className="mr-2 h-4 w-4" />
-            <span>View on Etherscan</span>
-          </a>
-        </DropdownMenuItem>
+        {isWalletUser && (
+          <DropdownMenuItem asChild>
+            <a
+              href={`https://etherscan.io/address/${walletAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="cursor-pointer"
+            >
+              <Wallet className="mr-2 h-4 w-4" />
+              <span>View on Etherscan</span>
+            </a>
+          </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
 

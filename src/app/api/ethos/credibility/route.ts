@@ -17,28 +17,47 @@ function getAdminClient() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { walletAddress } = body;
+    const { walletAddress, twitterUsername, twitterId } = body;
 
-    if (!walletAddress) {
+    // Validate that at least one identifier is provided
+    if (!walletAddress && !twitterUsername && !twitterId) {
       return NextResponse.json(
-        { error: "Wallet address is required" },
+        { error: "Wallet address, Twitter username, or Twitter ID is required" },
         { status: 400 }
       );
     }
 
-    const normalizedAddress = walletAddress.toLowerCase();
+    let ethosData: any = null;
+    let userLookupQuery: any = {};
 
-    // Fetch credibility from Ethos
-    const ethosData = await ethosClient.getCredibilityByAddress(normalizedAddress);
+    // Determine which identifier to use and fetch credibility from Ethos
+    if (walletAddress) {
+      const normalizedAddress = walletAddress.toLowerCase();
+      ethosData = await ethosClient.getCredibilityByAddress(normalizedAddress);
+      userLookupQuery.wallet_address = normalizedAddress;
+    } else if (twitterUsername) {
+      ethosData = await ethosClient.getCredibilityBySocialId('x.com', twitterUsername, 'username');
+      userLookupQuery.twitter_username = twitterUsername;
+    } else if (twitterId) {
+      ethosData = await ethosClient.getCredibilityBySocialId('x.com', twitterId, 'id');
+      userLookupQuery.twitter_id = twitterId;
+    }
 
     const supabase = getAdminClient();
 
     // Get current user data for sync log
-    const { data: currentUser } = await supabase
-      .from("users")
-      .select("id, ethos_score, ethos_credibility")
-      .eq("wallet_address", normalizedAddress)
-      .single();
+    let userQuery = supabase.from("users").select("id, ethos_score, ethos_credibility");
+    
+    // Apply the appropriate filter based on the identifier used
+    if (walletAddress) {
+      userQuery = userQuery.eq("wallet_address", walletAddress.toLowerCase());
+    } else if (twitterUsername) {
+      userQuery = userQuery.eq("twitter_username", twitterUsername);
+    } else if (twitterId) {
+      userQuery = userQuery.eq("twitter_id", twitterId);
+    }
+
+    const { data: currentUser } = await userQuery.single();
 
     if (!currentUser) {
       return NextResponse.json(
@@ -63,10 +82,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data: updatedUser, error: updateError } = await supabase
-      .from("users")
-      .update(updateData)
-      .eq("wallet_address", normalizedAddress)
+    // Update the user with the same filter criteria
+    let updateQuery = supabase.from("users").update(updateData);
+    
+    if (walletAddress) {
+      updateQuery = updateQuery.eq("wallet_address", walletAddress.toLowerCase());
+    } else if (twitterUsername) {
+      updateQuery = updateQuery.eq("twitter_username", twitterUsername);
+    } else if (twitterId) {
+      updateQuery = updateQuery.eq("twitter_id", twitterId);
+    }
+
+    const { data: updatedUser, error: updateError } = await updateQuery
       .select()
       .single();
 
