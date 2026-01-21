@@ -7,7 +7,7 @@ import { UserProfile, toUserProfile } from "@/types";
 import { useCallback, useEffect } from "react";
 
 export function useAuth() {
-  const { user, authenticated, ready, login, logout } = usePrivy();
+  const { user, authenticated, ready, login, logout, getAccessToken } = usePrivy();
   const queryClient = useQueryClient();
   const supabase = createClient();
 
@@ -32,7 +32,11 @@ export function useAuth() {
         query = query.eq("wallet_address", user.wallet.address.toLowerCase());
       } else if (user?.google) {
         query = query.eq("google_id", user.google.subject);
-      } else if (user?.twitter) {
+      } else if (user?.twitter?.username) {
+        // Query by twitter_username since that's what the API stores
+        query = query.eq("twitter_username", user.twitter.username);
+      } else if (user?.twitter?.subject) {
+        // Fallback to twitter_id if username not available
         query = query.eq("twitter_id", user.twitter.subject);
       } else {
         return null;
@@ -52,51 +56,83 @@ export function useAuth() {
     enabled: !!userIdentifier && authenticated,
   });
 
-  // Create or update user profile
+  // Create or update user profile via API (bypasses RLS)
   const createOrUpdateProfile = useMutation({
     mutationFn: async () => {
       if (!userIdentifier) throw new Error("No user identifier");
 
-      // Prepare user data based on auth method
-      const userData: Record<string, string | undefined> = {};
-
+      // Check if user exists using direct field queries instead of OR
+      let existingUser = null;
+      
       if (user?.wallet?.address) {
-        userData.wallet_address = walletAddress;
-        userData.auth_provider = 'wallet';
-      } else if (user?.google) {
-        userData.google_id = user.google.subject;
-        userData.google_email = user.google.email;
-        userData.auth_provider = 'google';
-      } else if (user?.twitter) {
-        userData.twitter_id = user.twitter.subject;
-        userData.twitter_username = user.twitter.username ?? undefined;
-        userData.auth_provider = 'twitter';
+        const { data } = await supabase
+          .from("users")
+          .select("id")
+          .eq("wallet_address", user.wallet.address.toLowerCase())
+          .maybeSingle();
+        existingUser = data;
+      } else if (user?.twitter?.username) {
+        // Check by twitter_username since that's what the API stores
+        const { data } = await supabase
+          .from("users")
+          .select("id")
+          .eq("twitter_username", user.twitter.username)
+          .maybeSingle();
+        existingUser = data;
+      } else if (user?.twitter?.subject) {
+        // Fallback to twitter_id
+        const { data } = await supabase
+          .from("users")
+          .select("id")
+          .eq("twitter_id", user.twitter.subject)
+          .maybeSingle();
+        existingUser = data;
+      } else if (user?.google?.subject) {
+        const { data } = await supabase
+          .from("users")
+          .select("id")
+          .eq("google_id", user.google.subject)
+          .maybeSingle();
+        existingUser = data;
+      } else {
+        throw new Error("No valid auth identifier");
       }
 
-      // Check if user exists
-      const googleId = user?.google?.subject || '';
-      const twitterId = user?.twitter?.subject || '';
-
-      const { data: existingUser } = await supabase
-        .from("users")
-        .select("id")
-        .or(`wallet_address.eq.${walletAddress || ''},google_id.eq.${googleId},twitter_id.eq.${twitterId}`)
-        .single();
-
       if (existingUser) {
-        // User exists, just return
+        // User exists, sync their credibility
         return existingUser;
       }
 
-      // Create new user
-      const { data, error } = await supabase
-        .from("users")
-        .insert(userData)
-        .select()
-        .single();
+      // Create new user via API endpoint (which uses service role)
+      const requestBody: Record<string, string> = {};
 
-      if (error) throw error;
-      return data;
+      if (user?.wallet?.address) {
+        requestBody.walletAddress = user.wallet.address.toLowerCase();
+      } else if (user?.twitter?.username) {
+        requestBody.twitterUsername = user.twitter.username;
+      } else if (user?.twitter?.subject) {
+        requestBody.twitterId = user.twitter.subject;
+      }
+
+      // Get Privy access token for authentication
+      const accessToken = await getAccessToken();
+
+      const response = await fetch("/api/ethos/credibility", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Failed to create user:", errorData);
+        throw new Error("Failed to create user profile");
+      }
+
+      return response.json();
     },
     onSuccess: () => {
       refetchProfile();
@@ -119,9 +155,20 @@ export function useAuth() {
         throw new Error("No valid identifier for credibility sync");
       }
 
+      // Get Privy access token for authentication
+      const accessToken = await getAccessToken();
+      
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (accessToken) {
+        headers.Authorization = `Bearer ${accessToken}`;
+      }
+
       const response = await fetch("/api/ethos/credibility", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify(requestBody),
       });
 
