@@ -1,7 +1,7 @@
 "use client";
 
 import { use, useCallback } from "react";
-import { useMarket, usePredictions } from "@/hooks";
+import { useMarket, usePredictions, useMarketRealtimeUpdates } from "@/hooks";
 import { ProbabilityToggle, CountdownTimer, ResolutionStatus } from "@/components/markets";
 import { PredictionForm } from "@/components/predictions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,9 @@ export default function MarketDetailPage({ params }: MarketDetailPageProps) {
   const { data: market, isLoading, error, refetch: refetchMarket } = useMarket(id);
   const { predictions, getMarketPredictions, refetchPredictions } = usePredictions(id);
   const queryClient = useQueryClient();
+
+  // Subscribe to real-time updates for this market
+  useMarketRealtimeUpdates(id);
 
   const userMarketPredictions = getMarketPredictions(id);
 

@@ -4,6 +4,7 @@
  */
 
 const COINGECKO_API_BASE = "https://api.coingecko.com/api/v3";
+const COINGECKO_API_KEY = process.env.COINGECKO_API_KEY;
 
 export interface CoinGeckoPrice {
   id: string;
@@ -36,9 +37,11 @@ const SYMBOL_TO_ID: Record<string, string> = {
 
 export class CoinGeckoClient {
   private baseUrl: string;
+  private apiKey?: string;
 
-  constructor() {
+  constructor(apiKey?: string) {
     this.baseUrl = COINGECKO_API_BASE;
+    this.apiKey = apiKey || COINGECKO_API_KEY;
   }
 
   /**
@@ -47,9 +50,10 @@ export class CoinGeckoClient {
   async getPrice(symbol: string): Promise<CoinGeckoPriceResponse | null> {
     try {
       const coinId = SYMBOL_TO_ID[symbol.toUpperCase()] || symbol.toLowerCase();
+      const apiKeyParam = this.apiKey ? `&x_cg_demo_api_key=${this.apiKey}` : "";
 
       const response = await fetch(
-        `${this.baseUrl}/simple/price?ids=${coinId}&vs_currencies=usd&include_last_updated_at=true`,
+        `${this.baseUrl}/simple/price?ids=${coinId}&vs_currencies=usd&include_last_updated_at=true${apiKeyParam}`,
         {
           headers: {
             Accept: "application/json",
@@ -92,9 +96,10 @@ export class CoinGeckoClient {
     try {
       const coinId = SYMBOL_TO_ID[symbol.toUpperCase()] || symbol.toLowerCase();
       const dateStr = `${date.getDate()}-${date.getMonth() + 1}-${date.getFullYear()}`;
+      const apiKeyParam = this.apiKey ? `&x_cg_demo_api_key=${this.apiKey}` : "";
 
       const response = await fetch(
-        `${this.baseUrl}/coins/${coinId}/history?date=${dateStr}`,
+        `${this.baseUrl}/coins/${coinId}/history?date=${dateStr}${apiKeyParam}`,
         {
           headers: {
             Accept: "application/json",
@@ -136,9 +141,10 @@ export class CoinGeckoClient {
       const coinIds = symbols.map(
         (s) => SYMBOL_TO_ID[s.toUpperCase()] || s.toLowerCase()
       );
+      const apiKeyParam = this.apiKey ? `&x_cg_demo_api_key=${this.apiKey}` : "";
 
       const response = await fetch(
-        `${this.baseUrl}/simple/price?ids=${coinIds.join(",")}&vs_currencies=usd&include_last_updated_at=true`,
+        `${this.baseUrl}/simple/price?ids=${coinIds.join(",")}&vs_currencies=usd&include_last_updated_at=true${apiKeyParam}`,
         {
           headers: {
             Accept: "application/json",

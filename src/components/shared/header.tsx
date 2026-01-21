@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LoginButton, UserMenu } from "@/components/auth";
+import { NotificationCenter } from "@/components/notifications";
 import { useAuth } from "@/hooks";
 import { cn } from "@/lib/utils";
 import { TrendingUp, Menu, X } from "lucide-react";
@@ -48,6 +49,11 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-2 md:ml-auto">
+          {isReady && isAuthenticated && (
+            <div className="hidden md:block">
+              <NotificationCenter />
+            </div>
+          )}
           {isReady && (
             <div className="hidden md:block">
               {isAuthenticated ? <UserMenu /> : <LoginButton />}
@@ -127,9 +133,16 @@ export function Header() {
                     duration: 0.3,
                     ease: [0.25, 0.46, 0.45, 0.94]
                   }}
-                  className="pt-2 border-t"
+                  className="pt-2 border-t flex items-center justify-between"
                 >
-                  {isAuthenticated ? <UserMenu /> : <LoginButton />}
+                  {isAuthenticated ? (
+                    <div className="flex items-center gap-3">
+                      <NotificationCenter />
+                      <UserMenu />
+                    </div>
+                  ) : (
+                    <LoginButton />
+                  )}
                 </motion.div>
               )}
             </motion.nav>
