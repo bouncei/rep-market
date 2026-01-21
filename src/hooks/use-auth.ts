@@ -29,11 +29,11 @@ export function useAuth() {
 
       // Build query based on auth method
       if (user?.wallet?.address) {
-        query = query.eq("wallet_address", walletAddress);
+        query = query.eq("wallet_address", user.wallet.address.toLowerCase());
       } else if (user?.google) {
-        query = query.eq("google_id", user.google.sub || user.google.id);
+        query = query.eq("google_id", user.google.subject);
       } else if (user?.twitter) {
-        query = query.eq("twitter_id", user.twitter.sub || user.twitter.id);
+        query = query.eq("twitter_id", user.twitter.subject);
       } else {
         return null;
       }
@@ -58,26 +58,29 @@ export function useAuth() {
       if (!userIdentifier) throw new Error("No user identifier");
 
       // Prepare user data based on auth method
-      const userData: any = {};
+      const userData: Record<string, string | undefined> = {};
 
       if (user?.wallet?.address) {
         userData.wallet_address = walletAddress;
         userData.auth_provider = 'wallet';
       } else if (user?.google) {
-        userData.google_id = user.google.sub || user.google.id;
+        userData.google_id = user.google.subject;
         userData.google_email = user.google.email;
         userData.auth_provider = 'google';
       } else if (user?.twitter) {
-        userData.twitter_id = user.twitter.sub || user.twitter.id;
-        userData.twitter_username = user.twitter.username;
+        userData.twitter_id = user.twitter.subject;
+        userData.twitter_username = user.twitter.username ?? undefined;
         userData.auth_provider = 'twitter';
       }
 
       // Check if user exists
+      const googleId = user?.google?.subject || '';
+      const twitterId = user?.twitter?.subject || '';
+
       const { data: existingUser } = await supabase
         .from("users")
         .select("id")
-        .or(`wallet_address.eq.${walletAddress || ''},google_id.eq.${user?.google?.sub || user?.google?.id || ''},twitter_id.eq.${user?.twitter?.sub || user?.twitter?.id || ''}`)
+        .or(`wallet_address.eq.${walletAddress || ''},google_id.eq.${googleId},twitter_id.eq.${twitterId}`)
         .single();
 
       if (existingUser) {
@@ -103,15 +106,15 @@ export function useAuth() {
   // Sync credibility from Ethos
   const syncCredibility = useMutation({
     mutationFn: async () => {
-      let requestBody: any = {};
+      const requestBody: Record<string, string> = {};
 
       // Determine which identifier to use based on auth method
       if (walletAddress) {
         requestBody.walletAddress = walletAddress;
       } else if (user?.twitter?.username) {
         requestBody.twitterUsername = user.twitter.username;
-      } else if (user?.twitter?.id || user?.twitter?.sub) {
-        requestBody.twitterId = user.twitter.id || user.twitter.sub;
+      } else if (user?.twitter?.subject) {
+        requestBody.twitterId = user.twitter.subject;
       } else {
         throw new Error("No valid identifier for credibility sync");
       }
@@ -135,10 +138,10 @@ export function useAuth() {
 
   // Auto-create profile on login
   useEffect(() => {
-    if (authenticated && walletAddress && !profile && !isLoadingProfile) {
+    if (authenticated && userIdentifier && !profile && !isLoadingProfile) {
       createOrUpdateProfile.mutate();
     }
-  }, [authenticated, walletAddress, profile, isLoadingProfile]);
+  }, [authenticated, userIdentifier, profile, isLoadingProfile]);
 
   // Handle logout
   const handleLogout = useCallback(async () => {

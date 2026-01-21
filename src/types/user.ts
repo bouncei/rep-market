@@ -9,10 +9,18 @@ export type CredibilityTier =
   | "GOLD"
   | "PLATINUM";
 
+// Auth provider type
+export type AuthProvider = "wallet" | "twitter" | "google";
+
 // User profile with display data
 export interface UserProfile {
   id: string;
-  walletAddress: string;
+  walletAddress: string | null;
+  authProvider: AuthProvider;
+  twitterId: string | null;
+  twitterUsername: string | null;
+  googleId: string | null;
+  googleEmail: string | null;
   ethosProfileId: number | null;
   ethosScore: number;
   ethosCredibility: number;
@@ -32,6 +40,11 @@ export function toUserProfile(user: User): UserProfile {
   return {
     id: user.id,
     walletAddress: user.wallet_address,
+    authProvider: (user.auth_provider as AuthProvider) ?? "wallet",
+    twitterId: user.twitter_id,
+    twitterUsername: user.twitter_username,
+    googleId: user.google_id,
+    googleEmail: user.google_email,
     ethosProfileId: user.ethos_profile_id,
     ethosScore: user.ethos_score ?? 0,
     ethosCredibility: user.ethos_credibility ?? 0,

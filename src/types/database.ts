@@ -291,54 +291,69 @@ export type Database = {
       users: {
         Row: {
           accuracy_rate: number | null
+          auth_provider: string | null
           correct_predictions: number | null
           created_at: string | null
           ethos_credibility: number | null
           ethos_last_synced_at: string | null
           ethos_profile_id: number | null
           ethos_score: number | null
+          google_email: string | null
+          google_id: string | null
           id: string
           rep_score: number | null
           tier: Database["public"]["Enums"]["credibility_tier"] | null
           total_predictions: number | null
           total_staked: number | null
           total_won: number | null
+          twitter_id: string | null
+          twitter_username: string | null
           updated_at: string | null
-          wallet_address: string
+          wallet_address: string | null
         }
         Insert: {
           accuracy_rate?: number | null
+          auth_provider?: string | null
           correct_predictions?: number | null
           created_at?: string | null
           ethos_credibility?: number | null
           ethos_last_synced_at?: string | null
           ethos_profile_id?: number | null
           ethos_score?: number | null
+          google_email?: string | null
+          google_id?: string | null
           id?: string
           rep_score?: number | null
           tier?: Database["public"]["Enums"]["credibility_tier"] | null
           total_predictions?: number | null
           total_staked?: number | null
           total_won?: number | null
+          twitter_id?: string | null
+          twitter_username?: string | null
           updated_at?: string | null
-          wallet_address: string
+          wallet_address?: string | null
         }
         Update: {
           accuracy_rate?: number | null
+          auth_provider?: string | null
           correct_predictions?: number | null
           created_at?: string | null
           ethos_credibility?: number | null
           ethos_last_synced_at?: string | null
           ethos_profile_id?: number | null
           ethos_score?: number | null
+          google_email?: string | null
+          google_id?: string | null
           id?: string
           rep_score?: number | null
           tier?: Database["public"]["Enums"]["credibility_tier"] | null
           total_predictions?: number | null
           total_staked?: number | null
           total_won?: number | null
+          twitter_id?: string | null
+          twitter_username?: string | null
           updated_at?: string | null
-          wallet_address?: string
+          wallet_address?: string | null
         }
         Relationships: []
       }
