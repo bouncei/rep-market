@@ -49,8 +49,11 @@ export function PredictionForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingStake, setExistingStake] = useState<number>(0);
 
-  const availableStake = Math.max(0, maxStake - existingStake);
-  const canPlacePrediction = isMarketOpen && position && stakeAmount > 0 && stakeAmount <= availableStake;
+  // Calculate constraints: tier limit and available RepScore
+  const availableRepScore = profile?.availableRepScore ?? 0;
+  const tierLimit = Math.max(0, maxStake - existingStake);
+  const maxAllowedStake = Math.min(tierLimit, availableRepScore);
+  const canPlacePrediction = isMarketOpen && position && stakeAmount > 0 && stakeAmount <= maxAllowedStake;
 
   const handlePlacePrediction = async () => {
     if (!profile || !position) return;
@@ -176,17 +179,21 @@ export function PredictionForm({
           <div className="flex items-center justify-between">
             <Label className="text-sm font-medium">Stake Amount</Label>
             <span className="text-xs text-muted-foreground">
-              Max: {availableStake} (Tier limit: {maxStake})
+              Max: {maxAllowedStake.toFixed(0)}
             </span>
+          </div>
+          <div className="text-xs text-muted-foreground flex justify-between mb-1">
+            <span>Tier limit: {tierLimit}</span>
+            <span>Available RepScore: {availableRepScore.toFixed(0)}</span>
           </div>
           <div className="space-y-4">
             <Slider
               value={[stakeAmount]}
               min={1}
-              max={Math.max(1, availableStake)}
+              max={Math.max(1, maxAllowedStake)}
               step={1}
               onValueChange={(values) => setStakeAmount(values[0])}
-              disabled={availableStake <= 0}
+              disabled={maxAllowedStake <= 0}
             />
             <div className="flex items-center gap-3">
               <Input
@@ -194,18 +201,18 @@ export function PredictionForm({
                 value={stakeAmount}
                 onChange={(e) => {
                   const value = Number(e.target.value);
-                  if (value >= 0 && value <= availableStake) {
+                  if (value >= 0 && value <= maxAllowedStake) {
                     setStakeAmount(value);
                   }
                 }}
                 min={1}
-                max={availableStake}
+                max={maxAllowedStake}
                 className="w-24"
-                disabled={availableStake <= 0}
+                disabled={maxAllowedStake <= 0}
               />
               <div className="flex gap-2">
                 {[10, 25, 50, 100].map((amount) => (
-                  amount <= availableStake && (
+                  amount <= maxAllowedStake && (
                     <Button
                       key={amount}
                       variant="outline"
@@ -271,9 +278,11 @@ export function PredictionForm({
           )}
         </Button>
 
-        {availableStake <= 0 && (
+        {maxAllowedStake <= 0 && (
           <p className="text-xs text-center text-destructive">
-            You have reached your stake limit for this market.
+            {availableRepScore <= 0
+              ? "You have no available RepScore. Wait for predictions to settle."
+              : "You have reached your stake limit for this market."}
           </p>
         )}
       </CardContent>

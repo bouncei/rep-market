@@ -37,10 +37,10 @@ export async function POST(request: NextRequest) {
     const { marketId, userId, position, stakeAmount } = parseResult.data;
     const supabase = getAdminClient();
 
-    // Fetch user to validate tier and credibility
+    // Fetch user to validate tier, credibility, and available RepScore
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("id, tier, ethos_credibility, rep_score")
+      .select("id, tier, ethos_credibility, rep_score, locked_rep_score")
       .eq("id", userId)
       .single();
 
@@ -55,6 +55,26 @@ export async function POST(request: NextRequest) {
     const userCredibility = user.ethos_credibility ?? 0;
     const effectiveTier = (user.tier as CredibilityTier) || getTierFromCredibility(userCredibility);
     const maxStake = getMaxStakeForTier(effectiveTier);
+
+    // Check available RepScore (total - locked)
+    const totalRepScore = user.rep_score ?? 0;
+    const lockedRepScore = user.locked_rep_score ?? 0;
+    const availableRepScore = totalRepScore - lockedRepScore;
+
+    if (stakeAmount > availableRepScore) {
+      return NextResponse.json(
+        {
+          error: "Insufficient available RepScore",
+          details: {
+            totalRepScore,
+            lockedRepScore,
+            availableRepScore,
+            requestedStake: stakeAmount,
+          }
+        },
+        { status: 400 }
+      );
+    }
 
     // Check stake cap
     if (stakeAmount > maxStake) {
@@ -168,12 +188,20 @@ export async function POST(request: NextRequest) {
     // Recalculate market probabilities
     await recalculateMarketProbabilities(supabase, marketId);
 
-    // Update user stats
+    // Lock the RepScore stake amount and update user stats
+    // We need to fetch current values for accurate increment
+    const { data: currentUser } = await supabase
+      .from("users")
+      .select("total_predictions, total_staked, locked_rep_score")
+      .eq("id", userId)
+      .single();
+
     await supabase
       .from("users")
       .update({
-        total_predictions: (user.rep_score ?? 0) + 1, // This should be total_predictions, fixing
-        total_staked: (existingStake + stakeAmount),
+        total_predictions: (currentUser?.total_predictions ?? 0) + 1,
+        total_staked: (currentUser?.total_staked ?? 0) + stakeAmount,
+        locked_rep_score: (currentUser?.locked_rep_score ?? 0) + stakeAmount,
       })
       .eq("id", userId);
 
@@ -216,6 +244,16 @@ async function recalculateMarketProbabilities(
   supabase: ReturnType<typeof getAdminClient>,
   marketId: string
 ) {
+  // Get market virtual stakes
+  const { data: marketData } = await supabase
+    .from("markets")
+    .select("virtual_stake_yes, virtual_stake_no")
+    .eq("id", marketId)
+    .single();
+
+  const virtualYes = marketData?.virtual_stake_yes ?? 100;
+  const virtualNo = marketData?.virtual_stake_no ?? 100;
+
   // Get all predictions for this market
   const { data: predictions, error } = await supabase
     .from("predictions")
@@ -243,18 +281,24 @@ async function recalculateMarketProbabilities(
     }
   }
 
-  // Calculate probabilities
-  const totalStake = totalStakeYes + totalStakeNo;
-  const totalWeighted = totalWeightedYes + totalWeightedNo;
+  // Include virtual liquidity in probability calculation
+  const effectiveYes = totalStakeYes + virtualYes;
+  const effectiveNo = totalStakeNo + virtualNo;
+  const effectiveTotal = effectiveYes + effectiveNo;
 
-  const rawProbabilityYes = totalStake > 0
-    ? (totalStakeYes / totalStake) * 100
-    : 50;
-  const weightedProbabilityYes = totalWeighted > 0
-    ? (totalWeightedYes / totalWeighted) * 100
-    : 50;
+  const effectiveWeightedYes = totalWeightedYes + virtualYes;
+  const effectiveWeightedNo = totalWeightedNo + virtualNo;
+  const effectiveWeightedTotal = effectiveWeightedYes + effectiveWeightedNo;
 
-  // Update market
+  // Calculate probabilities with virtual liquidity
+  const rawProbabilityYes = effectiveTotal > 0
+    ? effectiveYes / effectiveTotal
+    : 0.5;
+  const weightedProbabilityYes = effectiveWeightedTotal > 0
+    ? effectiveWeightedYes / effectiveWeightedTotal
+    : 0.5;
+
+  // Update market (store actual stake totals, not effective)
   await supabase
     .from("markets")
     .update({

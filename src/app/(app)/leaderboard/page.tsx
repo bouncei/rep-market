@@ -232,7 +232,7 @@ export default function LeaderboardPage() {
 }
 
 function PodiumCard({ user, rank, sortBy }: { user: LeaderboardUser; rank: number; sortBy: SortBy }) {
-  const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNVERIFIED");
+  const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNTRUSTED");
 
   const rankStyles = {
     1: {
@@ -324,7 +324,7 @@ function LeaderboardRow({
   sortBy: SortBy;
   isCurrentUser: boolean;
 }) {
-  const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNVERIFIED");
+  const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNTRUSTED");
 
   const getValue = () => {
     switch (sortBy) {
@@ -385,7 +385,7 @@ function LeaderboardMobileCard({
   sortBy: SortBy;
   isCurrentUser: boolean;
 }) {
-  const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNVERIFIED");
+  const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNTRUSTED");
 
   const getValue = () => {
     switch (sortBy) {

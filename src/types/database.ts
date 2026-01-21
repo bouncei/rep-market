@@ -122,6 +122,8 @@ export type Database = {
           total_weighted_stake_no: number | null
           total_weighted_stake_yes: number | null
           updated_at: string | null
+          virtual_stake_no: number | null
+          virtual_stake_yes: number | null
           weighted_probability_yes: number | null
         }
         Insert: {
@@ -148,6 +150,8 @@ export type Database = {
           total_weighted_stake_no?: number | null
           total_weighted_stake_yes?: number | null
           updated_at?: string | null
+          virtual_stake_no?: number | null
+          virtual_stake_yes?: number | null
           weighted_probability_yes?: number | null
         }
         Update: {
@@ -174,6 +178,8 @@ export type Database = {
           total_weighted_stake_no?: number | null
           total_weighted_stake_yes?: number | null
           updated_at?: string | null
+          virtual_stake_no?: number | null
+          virtual_stake_yes?: number | null
           weighted_probability_yes?: number | null
         }
         Relationships: []
@@ -301,6 +307,7 @@ export type Database = {
           google_email: string | null
           google_id: string | null
           id: string
+          locked_rep_score: number | null
           rep_score: number | null
           tier: Database["public"]["Enums"]["credibility_tier"] | null
           total_predictions: number | null
@@ -323,6 +330,7 @@ export type Database = {
           google_email?: string | null
           google_id?: string | null
           id?: string
+          locked_rep_score?: number | null
           rep_score?: number | null
           tier?: Database["public"]["Enums"]["credibility_tier"] | null
           total_predictions?: number | null
@@ -345,6 +353,7 @@ export type Database = {
           google_email?: string | null
           google_id?: string | null
           id?: string
+          locked_rep_score?: number | null
           rep_score?: number | null
           tier?: Database["public"]["Enums"]["credibility_tier"] | null
           total_predictions?: number | null
@@ -372,7 +381,7 @@ export type Database = {
       }
     }
     Enums: {
-      credibility_tier: "UNVERIFIED" | "BRONZE" | "SILVER" | "GOLD" | "PLATINUM"
+      credibility_tier: "UNTRUSTED" | "QUESTIONABLE" | "NEUTRAL" | "KNOWN" | "ESTABLISHED" | "REPUTABLE" | "EXEMPLARY" | "DISTINGUISHED" | "REVERED" | "RENOWNED"
       market_status:
         | "DRAFT"
         | "OPEN"

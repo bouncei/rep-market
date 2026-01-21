@@ -79,9 +79,15 @@ export function UserMenu() {
           <>
             <DropdownMenuLabel className="font-normal">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">RepScore</span>
-                <span className="font-semibold">{profile.repScore.toFixed(0)}</span>
+                <span className="text-xs text-muted-foreground">Available RepScore</span>
+                <span className="font-semibold">{profile.availableRepScore.toFixed(0)}</span>
               </div>
+              {profile.lockedRepScore > 0 && (
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-xs text-muted-foreground">Locked</span>
+                  <span className="font-semibold text-orange-500">{profile.lockedRepScore.toFixed(0)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between mt-1">
                 <span className="text-xs text-muted-foreground">Credibility</span>
                 <span className="font-semibold">{profile.ethosCredibility.toFixed(0)}</span>

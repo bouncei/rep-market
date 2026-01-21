@@ -283,15 +283,19 @@ async function settleMarkets(
           })
           .eq("id", prediction.id);
 
-        // Update user's RepScore
+        // Update user's RepScore and release locked stake
         const { data: user } = await supabase
           .from("users")
-          .select("rep_score, correct_predictions, total_won")
+          .select("rep_score, locked_rep_score, correct_predictions, total_won")
           .eq("id", prediction.user_id)
           .single();
 
         if (user) {
           const newRepScore = Math.max(0, (user.rep_score ?? 0) + repScoreDelta);
+          // Release locked stake (ensure it doesn't go negative)
+          const newLockedRepScore = Math.max(0,
+            (user.locked_rep_score ?? 0) - prediction.stake_amount
+          );
           const newCorrectPredictions = isWinner
             ? (user.correct_predictions ?? 0) + 1
             : (user.correct_predictions ?? 0);
@@ -301,6 +305,7 @@ async function settleMarkets(
             .from("users")
             .update({
               rep_score: newRepScore,
+              locked_rep_score: newLockedRepScore,
               correct_predictions: newCorrectPredictions,
               total_won: newTotalWon,
             })
@@ -348,7 +353,7 @@ async function processInvalidSettlement(
   supabase: ReturnType<typeof getAdminClient>,
   marketId: string
 ): Promise<void> {
-  // Refund all predictions
+  // Refund all predictions and release locked stakes
   const { data: predictions } = await supabase
     .from("predictions")
     .select("id, user_id, stake_amount")
@@ -365,6 +370,23 @@ async function processInvalidSettlement(
         rep_score_delta: 0, // No rep change for invalid markets
       })
       .eq("id", prediction.id);
+
+    // Release locked stake for each user
+    const { data: user } = await supabase
+      .from("users")
+      .select("locked_rep_score")
+      .eq("id", prediction.user_id)
+      .single();
+
+    if (user) {
+      const newLockedRepScore = Math.max(0,
+        (user.locked_rep_score ?? 0) - prediction.stake_amount
+      );
+      await supabase
+        .from("users")
+        .update({ locked_rep_score: newLockedRepScore })
+        .eq("id", prediction.user_id);
+    }
   }
 
   // Update market to CANCELLED (since it couldn't be resolved)

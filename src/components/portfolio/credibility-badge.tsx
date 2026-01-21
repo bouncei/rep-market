@@ -4,7 +4,18 @@ import { Badge } from "@/components/ui/badge";
 import { useCredibility } from "@/hooks";
 import { CredibilityTier } from "@/types";
 import { cn } from "@/lib/utils";
-import { Shield, Star, Crown, Gem, Circle } from "lucide-react";
+import {
+  Shield,
+  AlertTriangle,
+  CircleDot,
+  User,
+  Briefcase,
+  Star,
+  Award,
+  Medal,
+  Crown,
+  Gem,
+} from "lucide-react";
 
 interface CredibilityBadgeProps {
   credibility: number;
@@ -15,12 +26,18 @@ interface CredibilityBadgeProps {
   className?: string;
 }
 
+// Icons for the new 10-tier system
 const tierIcons: Record<CredibilityTier, React.ElementType> = {
-  UNVERIFIED: Circle,
-  BRONZE: Shield,
-  SILVER: Star,
-  GOLD: Crown,
-  PLATINUM: Gem,
+  UNTRUSTED: Shield,
+  QUESTIONABLE: AlertTriangle,
+  NEUTRAL: CircleDot,
+  KNOWN: User,
+  ESTABLISHED: Briefcase,
+  REPUTABLE: Star,
+  EXEMPLARY: Award,
+  DISTINGUISHED: Medal,
+  REVERED: Crown,
+  RENOWNED: Gem,
 };
 
 export function CredibilityBadge({

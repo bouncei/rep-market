@@ -214,7 +214,7 @@ export class DefiLlamaClient {
    */
   async getTotalTVL(): Promise<number | null> {
     try {
-      const response = await fetch(`${this.baseUrl}/tvl`, {
+      const response = await fetch(`${this.baseUrl}/v2/historicalChainTvl`, {
         headers: {
           Accept: "application/json",
         },
@@ -226,8 +226,15 @@ export class DefiLlamaClient {
         return null;
       }
 
-      const tvl = await response.json();
-      return typeof tvl === "number" ? tvl : null;
+      const data = await response.json();
+      
+      // The API returns an array of historical data, get the latest entry
+      if (Array.isArray(data) && data.length > 0) {
+        const latestEntry = data[data.length - 1];
+        return typeof latestEntry.tvl === "number" ? latestEntry.tvl : null;
+      }
+      
+      return null;
     } catch (error) {
       console.error("DeFiLlama total TVL fetch error:", error);
       return null;

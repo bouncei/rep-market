@@ -3,11 +3,16 @@ import { Tables } from "./database";
 export type User = Tables<"users">;
 
 export type CredibilityTier =
-  | "UNVERIFIED"
-  | "BRONZE"
-  | "SILVER"
-  | "GOLD"
-  | "PLATINUM";
+  | "UNTRUSTED"
+  | "QUESTIONABLE"
+  | "NEUTRAL"
+  | "KNOWN"
+  | "ESTABLISHED"
+  | "REPUTABLE"
+  | "EXEMPLARY"
+  | "DISTINGUISHED"
+  | "REVERED"
+  | "RENOWNED";
 
 // Auth provider type
 export type AuthProvider = "wallet" | "twitter" | "google";
@@ -25,6 +30,8 @@ export interface UserProfile {
   ethosScore: number;
   ethosCredibility: number;
   repScore: number;
+  lockedRepScore: number;
+  availableRepScore: number;
   tier: CredibilityTier;
   stats: {
     totalPredictions: number;
@@ -37,6 +44,9 @@ export interface UserProfile {
 
 // Transform database user to profile
 export function toUserProfile(user: User): UserProfile {
+  const repScore = user.rep_score ?? 0;
+  const lockedRepScore = user.locked_rep_score ?? 0;
+
   return {
     id: user.id,
     walletAddress: user.wallet_address,
@@ -48,8 +58,10 @@ export function toUserProfile(user: User): UserProfile {
     ethosProfileId: user.ethos_profile_id,
     ethosScore: user.ethos_score ?? 0,
     ethosCredibility: user.ethos_credibility ?? 0,
-    repScore: user.rep_score ?? 0,
-    tier: (user.tier as CredibilityTier) ?? "UNVERIFIED",
+    repScore,
+    lockedRepScore,
+    availableRepScore: repScore - lockedRepScore,
+    tier: (user.tier as CredibilityTier) ?? "UNTRUSTED",
     stats: {
       totalPredictions: user.total_predictions ?? 0,
       correctPredictions: user.correct_predictions ?? 0,

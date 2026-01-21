@@ -82,12 +82,14 @@ export async function POST(request: NextRequest) {
         resolves_at: data.resolvesAt,
         category: data.category,
         status: "OPEN" as MarketStatus,
-        raw_probability_yes: 50,
-        weighted_probability_yes: 50,
+        raw_probability_yes: 0.5,
+        weighted_probability_yes: 0.5,
         total_stake_yes: 0,
         total_stake_no: 0,
         total_weighted_stake_yes: 0,
         total_weighted_stake_no: 0,
+        virtual_stake_yes: 100,
+        virtual_stake_no: 100,
       })
       .select()
       .single();
