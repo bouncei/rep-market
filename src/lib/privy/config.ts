@@ -8,7 +8,7 @@ export const privyConfig: PrivyClientConfig = {
   appearance: {
     theme: "dark",
     accentColor: "#6366f1", // Indigo-500
-    logo: "/logo.svg",
+    logo: "/rep-market-logo.png",
   },
 };
 
