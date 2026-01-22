@@ -1,20 +1,36 @@
 "use client";
 
-import { useActiveMarkets } from "@/hooks";
-import { MarketCard } from "@/components/markets";
+import { useFilteredMarkets } from "@/hooks";
+import { MarketCard, MarketFilters } from "@/components/markets";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SectionHeader } from "@/components/ui/section-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, TrendingUp, Lock, BarChart3, Target, Zap } from "lucide-react";
+import { AlertCircle, TrendingUp, Lock, BarChart3, Target, Zap, Filter } from "lucide-react";
 import { ScrollReveal } from "@/components/animations";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
 
 export default function MarketsPage() {
-  const { data: markets, isLoading, error } = useActiveMarkets();
   const [activeTab, setActiveTab] = useState("open");
+  const [filters, setFilters] = useState<MarketFilters>({
+    search: '',
+    categories: [],
+    oracleTypes: [],
+    timeframe: 'all',
+    stakeRange: 'all',
+    probabilityRange: 'all',
+    sortBy: 'newest'
+  });
+
+  const { 
+    data: markets, 
+    totalCount, 
+    filteredCount, 
+    isLoading, 
+    error 
+  } = useFilteredMarkets(filters, ["OPEN", "LOCKED"]);
 
   if (error) {
     return (
@@ -26,8 +42,8 @@ export default function MarketsPage() {
     );
   }
 
-  const openMarkets = markets?.filter((m) => m.status === "OPEN") ?? [];
-  const lockedMarkets = markets?.filter((m) => m.status === "LOCKED") ?? [];
+  const openMarkets = markets.filter((m) => m.status === "OPEN");
+  const lockedMarkets = markets.filter((m) => m.status === "LOCKED");
 
   return (
     <div className="space-y-6">
@@ -37,8 +53,16 @@ export default function MarketsPage() {
         description="Browse active prediction markets and make your forecasts"
       />
 
+      {/* Market Filters */}
+      <MarketFilters
+        filters={filters}
+        onFiltersChange={setFilters}
+        totalMarkets={totalCount}
+        filteredCount={filteredCount}
+      />
+
       {/* Stats Summary */}
-      {!isLoading && markets && markets.length > 0 && (
+      {!isLoading && markets.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -113,13 +137,32 @@ export default function MarketsPage() {
                   <MarketGridSkeleton />
                 ) : openMarkets.length === 0 ? (
                   <EmptyState
-                    title="No Open Markets"
-                    description="There are no markets currently accepting predictions. Check back soon for new opportunities."
-                    icons={[TrendingUp, Target, BarChart3]}
-                    action={{
-                      label: "View Locked Markets",
-                      onClick: () => setActiveTab("locked"),
-                    }}
+                    title={filteredCount === 0 && totalCount > 0 ? "No Markets Match Filters" : "No Open Markets"}
+                    description={
+                      filteredCount === 0 && totalCount > 0 
+                        ? "Try adjusting your filters to see more markets."
+                        : "There are no markets currently accepting predictions. Check back soon for new opportunities."
+                    }
+                    icons={filteredCount === 0 && totalCount > 0 ? [Filter] : [TrendingUp, Target, BarChart3]}
+                    action={
+                      filteredCount === 0 && totalCount > 0 
+                        ? {
+                            label: "Clear Filters",
+                            onClick: () => setFilters({
+                              search: '',
+                              categories: [],
+                              oracleTypes: [],
+                              timeframe: 'all',
+                              stakeRange: 'all',
+                              probabilityRange: 'all',
+                              sortBy: 'newest'
+                            }),
+                          }
+                        : {
+                            label: "View Locked Markets",
+                            onClick: () => setActiveTab("locked"),
+                          }
+                    }
                   />
                 ) : (
                   <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -152,9 +195,29 @@ export default function MarketsPage() {
                   <MarketGridSkeleton />
                 ) : lockedMarkets.length === 0 ? (
                   <EmptyState
-                    title="No Locked Markets"
-                    description="Markets move to locked status when they're awaiting resolution."
-                    icons={[Lock]}
+                    title={filteredCount === 0 && totalCount > 0 ? "No Markets Match Filters" : "No Locked Markets"}
+                    description={
+                      filteredCount === 0 && totalCount > 0 
+                        ? "Try adjusting your filters to see more markets."
+                        : "Markets move to locked status when they're awaiting resolution."
+                    }
+                    icons={filteredCount === 0 && totalCount > 0 ? [Filter] : [Lock]}
+                    action={
+                      filteredCount === 0 && totalCount > 0 
+                        ? {
+                            label: "Clear Filters",
+                            onClick: () => setFilters({
+                              search: '',
+                              categories: [],
+                              oracleTypes: [],
+                              timeframe: 'all',
+                              stakeRange: 'all',
+                              probabilityRange: 'all',
+                              sortBy: 'newest'
+                            }),
+                          }
+                        : undefined
+                    }
                   />
                 ) : (
                   <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">

@@ -56,6 +56,18 @@ export async function POST(request: NextRequest) {
     const effectiveTier = (user.tier as CredibilityTier) || getTierFromCredibility(userCredibility);
     const maxStake = getMaxStakeForTier(effectiveTier);
 
+    // Block UNTRUSTED tier from trading
+    if (effectiveTier === "UNTRUSTED") {
+      return NextResponse.json(
+        {
+          error: "Trading restricted",
+          message: "Your Ethos credibility is below 800. Build your reputation on Ethos Network to unlock trading.",
+          details: { tier: effectiveTier, credibility: userCredibility, requiredCredibility: 800 }
+        },
+        { status: 403 }
+      );
+    }
+
     // Check available RepScore (total - locked)
     const totalRepScore = user.rep_score ?? 0;
     const lockedRepScore = user.locked_rep_score ?? 0;
@@ -251,8 +263,8 @@ async function recalculateMarketProbabilities(
     .eq("id", marketId)
     .single();
 
-  const virtualYes = marketData?.virtual_stake_yes ?? 100;
-  const virtualNo = marketData?.virtual_stake_no ?? 100;
+  const virtualYes = marketData?.virtual_stake_yes ?? 1000;
+  const virtualNo = marketData?.virtual_stake_no ?? 1000;
 
   // Get all predictions for this market
   const { data: predictions, error } = await supabase

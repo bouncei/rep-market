@@ -18,6 +18,8 @@ interface AccuracyDataPoint {
 interface UserStats {
   repScore: number | null;
   ethosCredibility: number | null;
+  ethosScore: number | null;
+  initialRepScore: number | null;
   accuracyRate: number | null;
   totalPredictions: number | null;
   totalWon: number | null;

@@ -11,6 +11,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   TrendingUp,
   Target,
   Wallet,
@@ -22,10 +31,15 @@ import {
   ArrowRight,
   BarChart3,
   ExternalLink,
+  DollarSign,
+  Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Prediction } from "@/hooks/use-predictions";
+import { Prediction, SellPreview } from "@/hooks/use-predictions";
+import { toast } from "sonner";
+import { useState, useEffect } from "react";
 
 export default function PortfolioPage() {
   return (
@@ -42,7 +56,15 @@ function PortfolioContent() {
     profile?.ethosCredibility ?? 0,
     profile?.tier
   );
-  const { predictions, portfolioStats, isLoading: isLoadingPredictions } = usePredictions();
+  const {
+    predictions,
+    portfolioStats,
+    isLoading: isLoadingPredictions,
+    sellPrediction,
+    getSellPreview,
+    isSellingPrediction,
+    refetchPredictions,
+  } = usePredictions();
   const { data: analyticsData, isLoading: isLoadingAnalytics } = useAnalytics(profile?.id);
 
   if (isLoadingProfile) {
@@ -199,7 +221,7 @@ function PortfolioContent() {
             data={analyticsData?.repScoreHistory ?? []}
             isLoading={isLoadingAnalytics}
             currentScore={profile.repScore}
-            initialScore={500}
+            initialScore={analyticsData?.user?.initialRepScore ?? profile.ethosCredibility ?? 0}
           />
         </motion.div>
         <motion.div
@@ -282,7 +304,13 @@ function PortfolioContent() {
                   ) : (
                     <div className="flex flex-col gap-3">
                       {activePredictions.map((prediction) => (
-                        <PredictionCard key={prediction.id} prediction={prediction} />
+                        <PredictionCard
+                          key={prediction.id}
+                          prediction={prediction}
+                          onSell={sellPrediction.mutate}
+                          getSellPreview={getSellPreview}
+                          isSellingPrediction={isSellingPrediction}
+                        />
                       ))}
                     </div>
                   )}
@@ -355,9 +383,9 @@ function PortfolioContent() {
               <Separator />
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-muted-foreground">Ethos Profile</span>
-                {profile.ethosProfileId ? (
+                {profile.twitterUsername ? (
                   <a
-                    href={`https://ethos.network/profile/${profile.ethosProfileId}`}
+                    href={`https://app.ethos.network/profile/x/${profile.twitterUsername}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-sm text-primary hover:underline inline-flex items-center gap-1"
@@ -431,88 +459,247 @@ function PortfolioContent() {
   );
 }
 
-function PredictionCard({ prediction }: { prediction: Prediction }) {
+interface PredictionCardProps {
+  prediction: Prediction;
+  onSell?: (predictionId: string) => void;
+  getSellPreview?: (predictionId: string) => Promise<SellPreview>;
+  isSellingPrediction?: boolean;
+}
+
+function PredictionCard({ prediction, onSell, getSellPreview, isSellingPrediction }: PredictionCardProps) {
+  const [sellDialogOpen, setSellDialogOpen] = useState(false);
+  const [sellPreview, setSellPreview] = useState<SellPreview | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
   const isWinner = prediction.isSettled && prediction.payoutAmount !== null && prediction.payoutAmount > prediction.stakeAmount;
   const isLoser = prediction.isSettled && prediction.payoutAmount !== null && prediction.payoutAmount < prediction.stakeAmount;
+  const canSell = !prediction.isSettled && prediction.market?.status === "OPEN" && onSell;
 
-  return (
-    <Link href={`/markets/${prediction.marketId}`}>
-      <Card className={`transition-all hover:bg-muted/50 hover:shadow-sm ${
-        prediction.isSettled
-          ? isWinner
-            ? "border-green-500/30 bg-green-500/5"
-            : isLoser
-            ? "border-red-500/30 bg-red-500/5"
-            : ""
+  // Fetch sell preview when dialog opens
+  useEffect(() => {
+    if (sellDialogOpen && getSellPreview && !sellPreview) {
+      setIsLoadingPreview(true);
+      getSellPreview(prediction.id)
+        .then(setSellPreview)
+        .catch((err) => {
+          toast.error(err.message || "Failed to load sell preview");
+          setSellDialogOpen(false);
+        })
+        .finally(() => setIsLoadingPreview(false));
+    }
+  }, [sellDialogOpen, getSellPreview, prediction.id, sellPreview]);
+
+  const handleSell = () => {
+    if (onSell) {
+      onSell(prediction.id);
+      setSellDialogOpen(false);
+      toast.success("Position sold successfully");
+    }
+  };
+
+  const cardContent = (
+    <Card className={`transition-all hover:bg-muted/50 hover:shadow-sm ${
+      prediction.isSettled
+        ? isWinner
+          ? "border-green-500/30 bg-green-500/5"
+          : isLoser
+          ? "border-red-500/30 bg-red-500/5"
           : ""
-      }`}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-sm line-clamp-2 mb-2">
-                {prediction.market?.title ?? "Unknown Market"}
-              </p>
-              <div className="flex items-center gap-2 flex-wrap">
-                <Badge
-                  variant="outline"
-                  className={
-                    prediction.position === "YES"
-                      ? "bg-green-500/10 text-green-500 border-green-500/20"
-                      : "bg-red-500/10 text-red-500 border-red-500/20"
-                  }
-                >
-                  {prediction.position}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  Stake: {prediction.stakeAmount}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  Weighted: {prediction.weightedStake.toFixed(1)}
-                </span>
-              </div>
+        : ""
+    }`}>
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm line-clamp-2 mb-2">
+              {prediction.market?.title ?? "Unknown Market"}
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Badge
+                variant="outline"
+                className={
+                  prediction.position === "YES"
+                    ? "bg-green-500/10 text-green-500 border-green-500/20"
+                    : "bg-red-500/10 text-red-500 border-red-500/20"
+                }
+              >
+                {prediction.position}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                Stake: {prediction.stakeAmount}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                Weighted: {prediction.weightedStake.toFixed(1)}
+              </span>
             </div>
-            <div className="text-right shrink-0">
-              {prediction.isSettled ? (
-                <>
-                  <div className="flex items-center gap-1.5 justify-end mb-1">
-                    {isWinner ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : isLoser ? (
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    ) : null}
-                    <span className={`font-semibold ${
-                      isWinner ? "text-green-500" : isLoser ? "text-red-500" : ""
-                    }`}>
-                      {prediction.payoutAmount?.toFixed(1) ?? 0}
-                    </span>
-                  </div>
-                  {prediction.repScoreDelta !== null && prediction.repScoreDelta !== 0 && (
-                    <span className={`text-xs ${
-                      prediction.repScoreDelta > 0 ? "text-green-500" : "text-red-500"
-                    }`}>
-                      Rep: {prediction.repScoreDelta > 0 ? "+" : ""}{prediction.repScoreDelta}
-                    </span>
-                  )}
-                </>
-              ) : (
+          </div>
+          <div className="text-right shrink-0">
+            {prediction.isSettled ? (
+              <>
+                <div className="flex items-center gap-1.5 justify-end mb-1">
+                  {isWinner ? (
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                  ) : isLoser ? (
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  ) : null}
+                  <span className={`font-semibold ${
+                    isWinner ? "text-green-500" : isLoser ? "text-red-500" : ""
+                  }`}>
+                    {prediction.payoutAmount?.toFixed(1) ?? 0}
+                  </span>
+                </div>
+                {prediction.repScoreDelta !== null && prediction.repScoreDelta !== 0 && (
+                  <span className={`text-xs ${
+                    prediction.repScoreDelta > 0 ? "text-green-500" : "text-red-500"
+                  }`}>
+                    Rep: {prediction.repScoreDelta > 0 ? "+" : ""}{prediction.repScoreDelta}
+                  </span>
+                )}
+              </>
+            ) : (
+              <div className="flex items-center gap-2">
+                {canSell && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setSellDialogOpen(true);
+                    }}
+                  >
+                    <DollarSign className="h-3 w-3 mr-1" />
+                    Sell
+                  </Button>
+                )}
                 <Badge variant="secondary" className="text-xs">
                   {prediction.market?.status ?? "OPEN"}
                 </Badge>
-              )}
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="mt-2 text-xs text-muted-foreground">
+          {new Date(prediction.createdAt).toLocaleDateString(undefined, {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <>
+      <Link href={`/markets/${prediction.marketId}`}>
+        {cardContent}
+      </Link>
+
+      {/* Sell Dialog */}
+      <Dialog open={sellDialogOpen} onOpenChange={setSellDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Sell Position</DialogTitle>
+            <DialogDescription>
+              Exit your {prediction.position} position on this market at the current price.
+            </DialogDescription>
+          </DialogHeader>
+
+          {isLoadingPreview ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          </div>
-          <div className="mt-2 text-xs text-muted-foreground">
-            {new Date(prediction.createdAt).toLocaleDateString(undefined, {
-              month: "short",
-              day: "numeric",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-            })}
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+          ) : sellPreview ? (
+            <div className="space-y-4">
+              {/* High Slippage Warning */}
+              {sellPreview.sellValue.effectiveSlippagePercent && sellPreview.sellValue.effectiveSlippagePercent > 2 && (
+                <div className="rounded-lg border border-orange-500/30 bg-orange-500/5 p-3 flex gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium text-orange-500">High Slippage Warning</p>
+                    <p className="text-muted-foreground">
+                      This trade will incur {sellPreview.sellValue.effectiveSlippagePercent.toFixed(1)}% in total costs (fees + price impact)
+                      due to current market liquidity. More participants will improve pricing stability.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg border p-4 space-y-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Position</span>
+                  <Badge
+                    variant="outline"
+                    className={
+                      sellPreview.position === "YES"
+                        ? "bg-green-500/10 text-green-500 border-green-500/20"
+                        : "bg-red-500/10 text-red-500 border-red-500/20"
+                    }
+                  >
+                    {sellPreview.position}
+                  </Badge>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Original Stake</span>
+                  <span className="font-medium">{sellPreview.originalStake}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Current Probability</span>
+                  <span className="font-medium">{(sellPreview.currentProbability * 100).toFixed(1)}%</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Base Value</span>
+                  <span>{sellPreview.sellValue.baseValue.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Price Impact</span>
+                  <span className="text-orange-500">-{sellPreview.sellValue.priceImpact.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Exit Fee (0.5%)</span>
+                  <span className="text-orange-500">-{sellPreview.sellValue.fee.toFixed(2)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-medium">
+                  <span>You Receive</span>
+                  <span className="text-lg">{sellPreview.sellValue.netValue.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Profit/Loss</span>
+                  <span className={sellPreview.profitLoss.amount >= 0 ? "text-green-500" : "text-red-500"}>
+                    {sellPreview.profitLoss.amount >= 0 ? "+" : ""}{sellPreview.profitLoss.amount.toFixed(2)}
+                    {" "}({sellPreview.profitLoss.percent >= 0 ? "+" : ""}{sellPreview.profitLoss.percent.toFixed(1)}%)
+                  </span>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="flex gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setSellDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSell}
+              disabled={isSellingPrediction || isLoadingPreview || !sellPreview?.canSell}
+            >
+              {isSellingPrediction ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Selling...
+                </>
+              ) : (
+                "Confirm Sell"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

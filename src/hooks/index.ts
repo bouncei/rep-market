@@ -5,3 +5,4 @@ export * from "./use-predictions";
 export * from "./use-leaderboard";
 export * from "./use-realtime";
 export * from "./use-analytics";
+export * from "./use-user-ethos";

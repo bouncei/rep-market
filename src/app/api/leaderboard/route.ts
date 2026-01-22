@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Database } from "@/types/database";
+import { getTierFromCredibility } from "@/constants/tiers";
 
 function getClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
       twitter_username: user.twitter_username,
       rep_score: user.rep_score ?? 0,
       ethos_credibility: user.ethos_credibility ?? 0,
-      tier: user.tier ?? "UNVERIFIED",
+      tier: user.tier ?? getTierFromCredibility(user.ethos_credibility ?? 0),
       total_predictions: user.total_predictions ?? 0,
       correct_predictions: user.correct_predictions ?? 0,
       accuracy_rate: user.accuracy_rate ?? 0,
@@ -118,7 +119,7 @@ export async function GET(request: NextRequest) {
             twitter_username: userData.twitter_username,
             rep_score: userData.rep_score ?? 0,
             ethos_credibility: userData.ethos_credibility ?? 0,
-            tier: userData.tier ?? "UNVERIFIED",
+            tier: userData.tier ?? getTierFromCredibility(userData.ethos_credibility ?? 0),
             total_predictions: userData.total_predictions ?? 0,
             correct_predictions: userData.correct_predictions ?? 0,
             accuracy_rate: userData.accuracy_rate ?? 0,

@@ -119,6 +119,42 @@ export function PredictionForm({
     );
   }
 
+  // Block UNTRUSTED tier from trading
+  if (tier.name === "UNTRUSTED") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm sm:text-base flex items-center justify-between">
+            <span>Trading Restricted</span>
+            <Badge className={`${tier.bgColor} ${tier.color} ${tier.borderColor}`}>
+              {tier.displayName}
+            </Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-destructive/10 border border-destructive/20">
+            <AlertCircle className="h-5 w-5 text-destructive mt-0.5 flex-shrink-0" />
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-destructive">
+                Your Ethos credibility is below 800
+              </p>
+              <p className="text-sm text-muted-foreground">
+                Build your reputation on Ethos Network to unlock trading on RepMarket.
+              </p>
+            </div>
+          </div>
+          <Button
+            className="w-full"
+            variant="outline"
+            onClick={() => window.open("https://ethos.network", "_blank")}
+          >
+            Build Your Reputation on Ethos
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   // Market not open
   if (!isMarketOpen) {
     return (

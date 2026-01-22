@@ -22,10 +22,10 @@ export async function GET(request: NextRequest) {
 
     const supabase = getAdminClient();
 
-    // Fetch user data
+    // Fetch user data including ethos_score for initial RepScore
     const { data: user, error: userError } = await supabase
       .from("users")
-      .select("rep_score, ethos_credibility, accuracy_rate, total_predictions, total_won, correct_predictions, created_at")
+      .select("rep_score, ethos_credibility, ethos_score, accuracy_rate, total_predictions, total_won, correct_predictions, created_at")
       .eq("id", userId)
       .single();
 
@@ -65,10 +65,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate RepScore history points
+    // Initial RepScore is set from user's Ethos score when they joined
+    const initialScore = user.ethos_score ?? user.ethos_credibility ?? 0;
     const repScoreHistory = generateRepScoreHistory(
-      user.rep_score ?? 500,
+      user.rep_score ?? initialScore,
       predictions || [],
-      user.created_at
+      user.created_at,
+      initialScore
     );
 
     // Generate accuracy by period (monthly)
@@ -78,6 +81,8 @@ export async function GET(request: NextRequest) {
       user: {
         repScore: user.rep_score,
         ethosCredibility: user.ethos_credibility,
+        ethosScore: user.ethos_score,
+        initialRepScore: initialScore, // The user's initial RepScore when they joined
         accuracyRate: user.accuracy_rate,
         totalPredictions: user.total_predictions,
         totalWon: user.total_won,
@@ -109,32 +114,41 @@ interface PredictionWithMarket {
 function generateRepScoreHistory(
   currentScore: number,
   predictions: PredictionWithMarket[],
-  userCreatedAt: string | null
+  userCreatedAt: string | null,
+  initialScore: number
 ): { date: string; value: number }[] {
   const history: { date: string; value: number }[] = [];
-  const initialScore = 500;
   const startDate = userCreatedAt ?? new Date().toISOString();
 
-  // Start with account creation
+  // Start with account creation - use user's actual Ethos score as initial RepScore
   history.push({
     date: startDate,
     value: initialScore,
   });
 
-  // Calculate running score from predictions
+  // Calculate running score from settled predictions (rep_score_delta)
   let runningScore = initialScore;
 
   for (const pred of predictions) {
-    if (pred.rep_score_delta && pred.created_at) {
+    if (pred.rep_score_delta !== null && pred.rep_score_delta !== 0 && pred.created_at) {
       runningScore += pred.rep_score_delta;
       history.push({
         date: pred.created_at,
-        value: runningScore,
+        value: Math.max(0, runningScore), // RepScore cannot go below 0
       });
     }
   }
 
-  // If no predictions, add current date with current score
+  // If current score differs from calculated running score, add current point
+  // This accounts for Ethos sync deltas that aren't tied to predictions
+  if (Math.abs(runningScore - currentScore) > 0.1) {
+    history.push({
+      date: new Date().toISOString(),
+      value: currentScore,
+    });
+  }
+
+  // If only have initial point, add current score as second point
   if (history.length === 1) {
     history.push({
       date: new Date().toISOString(),
