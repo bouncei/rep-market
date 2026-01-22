@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks";
 import { cn } from "@/lib/utils";
 import { TrendingUp, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
 
 const navLinks = [
@@ -28,6 +29,9 @@ export function Header() {
         <Link href="/" className="flex items-center space-x-2">
           <TrendingUp className="h-6 w-6" />
           <span className="font-bold">RepMarket</span>
+          <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 bg-primary/10 text-primary border-primary/30">
+            Beta
+          </Badge>
         </Link>
 
         {/* Desktop Navigation */}

@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
 
     const supabase = getAdminClient();
 
-    // Get current user data for sync log
-    let userQuery = supabase.from("users").select("id, ethos_score, ethos_credibility");
+    // Get current user data for sync log and delta calculation
+    let userQuery = supabase.from("users").select("id, ethos_score, ethos_credibility, rep_score");
     
     // Apply the appropriate filter based on the identifier used
     if (walletAddress) {
@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         if (createError.code === '23505') {
           console.log('[DEBUG] Duplicate key - user was created by concurrent request, retrying lookup');
           // Rebuild query since it was already consumed
-          let retryQuery = supabase.from("users").select("id, ethos_score, ethos_credibility");
+          let retryQuery = supabase.from("users").select("id, ethos_score, ethos_credibility, rep_score");
           if (walletAddress) {
             retryQuery = retryQuery.eq("wallet_address", walletAddress.toLowerCase());
           } else if (twitterUsername) {
@@ -168,9 +168,21 @@ export async function POST(request: NextRequest) {
       updateData.ethos_score = ethosData.score;
       updateData.ethos_credibility = ethosData.credibility;
 
-      // Initialize RepScore from Ethos score if this is first sync
-      if (!currentUser.ethos_score || currentUser.ethos_score === 0) {
-        updateData.rep_score = ethosData.score;
+      // Bidirectional RepScore sync: apply Ethos score delta to RepScore
+      const previousEthosScore = currentUser.ethos_score ?? 0;
+      const newEthosScore = ethosData.score;
+      const currentRepScore = currentUser.rep_score ?? 0;
+
+      if (!previousEthosScore || previousEthosScore === 0) {
+        // First sync: initialize RepScore from Ethos score
+        updateData.rep_score = newEthosScore;
+      } else {
+        // Subsequent syncs: apply delta
+        const delta = newEthosScore - previousEthosScore;
+        if (delta !== 0) {
+          updateData.rep_score = Math.max(0, currentRepScore + delta);
+          console.log(`[DEBUG] RepScore delta sync: ${currentRepScore} + ${delta} = ${updateData.rep_score}`);
+        }
       }
     }
 

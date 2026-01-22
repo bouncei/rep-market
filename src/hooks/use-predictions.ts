@@ -43,6 +43,51 @@ interface PlacePredictionResult {
   };
 }
 
+interface SellPredictionResult {
+  success: boolean;
+  sale: {
+    predictionId: string;
+    originalStake: number;
+    position: "YES" | "NO";
+    sellValue: {
+      baseValue: number;
+      priceImpact: number;
+      fee: number;
+      netValue: number;
+    };
+    profitLoss: {
+      amount: number;
+      percent: number;
+    };
+    repScoreDelta: number;
+  };
+  marketUpdates?: {
+    rawProbabilityYes: number;
+    weightedProbabilityYes: number;
+    totalStakeYes: number;
+    totalStakeNo: number;
+  };
+}
+
+export interface SellPreview {
+  predictionId: string;
+  position: "YES" | "NO";
+  originalStake: number;
+  currentProbability: number;
+  sellValue: {
+    baseValue: number;
+    priceImpact: number;
+    fee: number;
+    netValue: number;
+  };
+  profitLoss: {
+    amount: number;
+    percent: number;
+  };
+  canSell: boolean;
+  marketStatus: string;
+}
+
 export function usePredictions(marketId?: string) {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
@@ -73,6 +118,54 @@ export function usePredictions(marketId?: string) {
       return data.predictions;
     },
     enabled: !!profile?.id,
+  });
+
+  // Get sell preview for a prediction
+  const getSellPreview = async (predictionId: string): Promise<SellPreview> => {
+    const response = await fetch(`/api/predictions/${predictionId}/sell`);
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || "Failed to get sell preview");
+    }
+    const data = await response.json();
+    return data.preview;
+  };
+
+  // Sell a prediction
+  const sellPrediction = useMutation<SellPredictionResult, Error, string>({
+    mutationFn: async (predictionId: string) => {
+      if (!profile?.id) {
+        throw new Error("User not authenticated");
+      }
+
+      const response = await fetch(`/api/predictions/${predictionId}/sell`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profile.id }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to sell prediction");
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      // Invalidate predictions query to refetch
+      queryClient.invalidateQueries({
+        queryKey: ["predictions", profile?.id],
+      });
+
+      // Invalidate user profile to update rep_score
+      queryClient.invalidateQueries({
+        queryKey: ["user-profile"],
+      });
+
+      // Update markets list
+      queryClient.invalidateQueries({ queryKey: ["markets"] });
+    },
   });
 
   // Place a new prediction
@@ -161,10 +254,13 @@ export function usePredictions(marketId?: string) {
     error,
     refetchPredictions,
     placePrediction,
+    sellPrediction,
+    getSellPreview,
     getMarketStake,
     getMarketPredictions,
     portfolioStats,
     isPlacingPrediction: placePrediction.isPending,
+    isSellingPrediction: sellPrediction.isPending,
   };
 }
 
