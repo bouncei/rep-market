@@ -1,15 +1,17 @@
 "use client";
 
-import { use } from "react";
-import { useMarket } from "@/hooks";
-import { ProbabilityToggle, CountdownTimer } from "@/components/markets";
+import { use, useCallback } from "react";
+import { useMarket, usePredictions, useMarketRealtimeUpdates } from "@/hooks";
+import { ProbabilityToggle, CountdownTimer, ResolutionStatus } from "@/components/markets";
+import { PredictionForm } from "@/components/predictions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, ArrowLeft, Clock, TrendingUp, Users } from "lucide-react";
+import { AlertCircle, ArrowLeft, Clock, TrendingUp, Users, History } from "lucide-react";
 import Link from "next/link";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface MarketDetailPageProps {
   params: Promise<{ id: string }>;
@@ -26,7 +28,20 @@ const statusColors: Record<string, string> = {
 
 export default function MarketDetailPage({ params }: MarketDetailPageProps) {
   const { id } = use(params);
-  const { data: market, isLoading, error } = useMarket(id);
+  const { data: market, isLoading, error, refetch: refetchMarket } = useMarket(id);
+  const { predictions, getMarketPredictions, refetchPredictions } = usePredictions(id);
+  const queryClient = useQueryClient();
+
+  // Subscribe to real-time updates for this market
+  useMarketRealtimeUpdates(id);
+
+  const userMarketPredictions = getMarketPredictions(id);
+
+  const handlePredictionPlaced = useCallback(() => {
+    refetchMarket();
+    refetchPredictions();
+    queryClient.invalidateQueries({ queryKey: ["markets"] });
+  }, [refetchMarket, refetchPredictions, queryClient]);
 
   if (isLoading) {
     return <MarketDetailSkeleton />;
@@ -48,6 +63,7 @@ export default function MarketDetailPage({ params }: MarketDetailPageProps) {
   }
 
   const isOpen = market.status === "OPEN";
+  const isResolved = market.status === "RESOLVED" || market.status === "SETTLED";
   const totalStake =
     (market.total_stake_yes ?? 0) + (market.total_stake_no ?? 0);
 
@@ -76,6 +92,16 @@ export default function MarketDetailPage({ params }: MarketDetailPageProps) {
           <p className="text-sm sm:text-base text-muted-foreground">{market.description}</p>
         )}
       </div>
+
+      {/* Resolution Status for resolved/settled markets */}
+      {isResolved && (
+        <ResolutionStatus
+          status={market.status}
+          outcome={market.resolution_outcome}
+          resolutionValue={market.resolution_value}
+          settledAt={market.settled_at}
+        />
+      )}
 
       <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
         {/* Main probability card */}
@@ -147,19 +173,90 @@ export default function MarketDetailPage({ params }: MarketDetailPageProps) {
             </CardContent>
           </Card>
 
-          {/* Action buttons - disabled for now */}
-          {isOpen && (
+          {/* Prediction Form */}
+          <PredictionForm
+            marketId={id}
+            marketTitle={market.title}
+            currentYesProbability={market.weighted_probability_yes ?? 50}
+            isMarketOpen={isOpen}
+            onPredictionPlaced={handlePredictionPlaced}
+          />
+
+          {/* User's Predictions on this Market */}
+          {userMarketPredictions.length > 0 && (
             <Card>
-              <CardContent className="pt-4 sm:pt-6 space-y-3">
-                <Button className="w-full text-sm sm:text-base" size="lg" disabled>
-                  Predict YES
-                </Button>
-                <Button className="w-full text-sm sm:text-base" variant="outline" size="lg" disabled>
-                  Predict NO
-                </Button>
-                <p className="text-xs text-center text-muted-foreground">
-                  Prediction placement coming in Phase 2
-                </p>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <History className="h-3 w-3 sm:h-4 sm:w-4" />
+                  Your Predictions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {userMarketPredictions.map((pred) => {
+                  const isWinner = isResolved && market.resolution_outcome === pred.position;
+                  const isLoser = isResolved && market.resolution_outcome && market.resolution_outcome !== pred.position && market.resolution_outcome !== "INVALID";
+
+                  return (
+                    <div
+                      key={pred.id}
+                      className={`flex items-center justify-between p-3 rounded-lg ${
+                        pred.isSettled
+                          ? isWinner
+                            ? "bg-green-500/10 border border-green-500/20"
+                            : isLoser
+                            ? "bg-red-500/10 border border-red-500/20"
+                            : "bg-muted/50"
+                          : "bg-muted/50"
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <Badge
+                          variant="outline"
+                          className={
+                            pred.position === "YES"
+                              ? "bg-green-500/10 text-green-500 border-green-500/20"
+                              : "bg-red-500/10 text-red-500 border-red-500/20"
+                          }
+                        >
+                          {pred.position}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground">
+                          {new Date(pred.createdAt).toLocaleDateString()}
+                        </p>
+                        {pred.isSettled && (
+                          <Badge variant="outline" className="text-xs">
+                            {isWinner ? "Won" : isLoser ? "Lost" : "Refunded"}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">{pred.stakeAmount}</p>
+                        {pred.isSettled && pred.payoutAmount !== null ? (
+                          <p className={`text-sm font-medium ${
+                            pred.payoutAmount > pred.stakeAmount
+                              ? "text-green-500"
+                              : pred.payoutAmount < pred.stakeAmount
+                              ? "text-red-500"
+                              : "text-muted-foreground"
+                          }`}>
+                            Payout: {pred.payoutAmount.toFixed(1)}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-muted-foreground">
+                            Weighted: {pred.weightedStake.toFixed(1)}
+                          </p>
+                        )}
+                        {pred.repScoreDelta !== null && pred.repScoreDelta !== 0 && (
+                          <p className={`text-xs ${
+                            pred.repScoreDelta > 0 ? "text-green-500" : "text-red-500"
+                          }`}>
+                            Rep: {pred.repScoreDelta > 0 ? "+" : ""}{pred.repScoreDelta}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </CardContent>
             </Card>
           )}

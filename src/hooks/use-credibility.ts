@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { getTierConfig, TIER_CONFIGS } from "@/constants";
+import { getTierConfig, getTierFromCredibility, TIER_ORDER, TIER_CONFIGS } from "@/constants";
 import { CredibilityTier } from "@/types";
 
 export function useCredibility(credibility: number, tier?: CredibilityTier) {
@@ -11,31 +11,30 @@ export function useCredibility(credibility: number, tier?: CredibilityTier) {
   }, [credibility, tier]);
 
   const progress = useMemo(() => {
-    const tiers = Object.values(TIER_CONFIGS);
-    const currentIndex = tiers.findIndex((t) => t.name === tierConfig.name);
+    const currentIndex = TIER_ORDER.indexOf(tierConfig.name);
 
-    if (currentIndex === tiers.length - 1) {
-      // Already at max tier
+    if (currentIndex === TIER_ORDER.length - 1) {
+      // Already at max tier (RENOWNED)
       return 100;
     }
 
-    const nextTier = tiers[currentIndex + 1];
+    const nextTierName = TIER_ORDER[currentIndex + 1];
+    const nextTierConfig = TIER_CONFIGS[nextTierName];
     const prevMin = tierConfig.minCredibility;
-    const nextMin = nextTier.minCredibility;
+    const nextMin = nextTierConfig.minCredibility;
     const range = nextMin - prevMin;
 
-    return Math.min(100, ((credibility - prevMin) / range) * 100);
+    return Math.min(100, Math.max(0, ((credibility - prevMin) / range) * 100));
   }, [credibility, tierConfig]);
 
   const nextTier = useMemo(() => {
-    const tiers = Object.values(TIER_CONFIGS);
-    const currentIndex = tiers.findIndex((t) => t.name === tierConfig.name);
+    const currentIndex = TIER_ORDER.indexOf(tierConfig.name);
 
-    if (currentIndex === tiers.length - 1) {
+    if (currentIndex === TIER_ORDER.length - 1) {
       return null;
     }
 
-    return tiers[currentIndex + 1];
+    return TIER_CONFIGS[TIER_ORDER[currentIndex + 1]];
   }, [tierConfig]);
 
   const credibilityToNextTier = useMemo(() => {
@@ -50,12 +49,4 @@ export function useCredibility(credibility: number, tier?: CredibilityTier) {
     credibilityToNextTier,
     maxStake: tierConfig.maxStakePerMarket,
   };
-}
-
-function getTierFromCredibility(credibility: number): CredibilityTier {
-  if (credibility >= 2000) return "PLATINUM";
-  if (credibility >= 1500) return "GOLD";
-  if (credibility >= 1000) return "SILVER";
-  if (credibility >= 500) return "BRONZE";
-  return "UNVERIFIED";
 }
