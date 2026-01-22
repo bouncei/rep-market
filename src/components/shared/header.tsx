@@ -97,7 +97,7 @@ export function Header() {
                 duration: 0.3,
                 ease: [0.25, 0.46, 0.45, 0.94]
               }}
-              className="max-w-7xl mx-auto py-4 flex flex-col space-y-3"
+              className="max-w-7xl mx-auto px-4 py-4 flex flex-col space-y-3"
             >
               {navLinks.map((link, index) => (
                 <motion.div

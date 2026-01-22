@@ -195,7 +195,7 @@ export default function LandingPage() {
       </section>
 
       {/* Social Proof */}
-      <SocialProof />
+      {/* <SocialProof /> */}
 
       {/* CTA with Glow Effect */}
       <section className="relative max-w-7xl mx-auto py-16 sm:py-24 md:py-32 overflow-hidden px-4">

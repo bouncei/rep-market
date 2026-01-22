@@ -1,12 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import { useLeaderboard, getDisplayName, getInitials, SortBy, LeaderboardUser } from "@/hooks/use-leaderboard";
+import {
+  useLeaderboard,
+  getDisplayName,
+  getInitials,
+  SortBy,
+  LeaderboardUser,
+} from "@/hooks/use-leaderboard";
 import { useAuth } from "@/hooks/use-auth";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Table,
@@ -16,7 +21,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -24,9 +28,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { SectionHeader } from "@/components/ui/section-header";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PremiumPodium } from "@/components/leaderboard/premium-podium";
 import { getTierConfig } from "@/constants";
 import { CredibilityTier } from "@/types";
-import { Trophy, TrendingUp, Target, Award, Crown, Medal, Users } from "lucide-react";
+import {
+  Trophy,
+  TrendingUp,
+  Target,
+  Award,
+  Crown,
+  Users,
+  ArrowUp,
+  ArrowDown,
+  Minus,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -38,16 +55,35 @@ export default function LeaderboardPage() {
   const topThree = data?.leaderboard.slice(0, 3) ?? [];
   const restOfLeaderboard = data?.leaderboard.slice(3) ?? [];
 
+  // Convert to podium format
+  const podiumUsers = topThree.map((user) => ({
+    id: user.id,
+    rank: user.rank as 1 | 2 | 3,
+    displayName: getDisplayName(user),
+    avatar: undefined,
+    repScore:
+      sortBy === "rep_score"
+        ? user.rep_score
+        : sortBy === "total_won"
+        ? user.total_won
+        : sortBy === "ethos_credibility"
+        ? user.ethos_credibility
+        : user.accuracy_rate * 100,
+    accuracy: user.accuracy_rate,
+    tier: user.tier,
+    totalPredictions: user.total_predictions,
+  }));
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Leaderboard</h1>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            {data?.stats.totalRankedUsers ?? 0} predictors ranked by performance
-          </p>
-        </div>
+      {/* Header with Sort */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <SectionHeader
+          badge={{ text: "Updated Live", pulse: true, icon: Trophy }}
+          title="Leaderboard"
+          description={`${data?.stats.totalRankedUsers ?? 0} predictors ranked by performance`}
+          className="mb-0"
+        />
 
         {/* Sort Selector */}
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
@@ -90,22 +126,22 @@ export default function LeaderboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="border-primary/50 bg-primary/5">
-            <CardContent className="p-4">
+          <Card className="border-primary/50 bg-gradient-to-r from-primary/5 to-primary/10">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary font-bold text-lg">
+                  <div className="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/10 text-primary font-bold text-lg sm:text-xl">
                     #{data.userRank.rank}
                   </div>
                   <div>
-                    <p className="font-semibold">Your Ranking</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="font-semibold text-sm sm:text-base">Your Ranking</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       {getDisplayName(data.userRank)}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl sm:text-3xl font-bold">
                     {sortBy === "accuracy_rate"
                       ? `${(data.userRank.accuracy_rate * 100).toFixed(1)}%`
                       : sortBy === "total_won"
@@ -133,94 +169,90 @@ export default function LeaderboardPage() {
           </CardContent>
         </Card>
       ) : data?.leaderboard.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">
-              No users with predictions yet. Be the first!
-            </p>
-          </CardContent>
-        </Card>
+        <EmptyState
+          title="No Users Yet"
+          description="Be the first to make predictions and appear on the leaderboard!"
+          icons={[Trophy, TrendingUp, Target]}
+          action={{
+            label: "Browse Markets",
+            href: "/markets",
+          }}
+        />
       ) : (
         <>
           {/* Top 3 Podium */}
           {topThree.length >= 3 && (
-            <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
-              {/* 2nd Place */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="pt-8"
-              >
-                <PodiumCard user={topThree[1]} rank={2} sortBy={sortBy} />
-              </motion.div>
-
-              {/* 1st Place */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0 }}
-              >
-                <PodiumCard user={topThree[0]} rank={1} sortBy={sortBy} />
-              </motion.div>
-
-              {/* 3rd Place */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="pt-12"
-              >
-                <PodiumCard user={topThree[2]} rank={3} sortBy={sortBy} />
-              </motion.div>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-gradient-to-b from-amber-50/50 to-transparent dark:from-amber-950/20 rounded-xl p-4"
+            >
+              <PremiumPodium users={podiumUsers} />
+            </motion.div>
           )}
 
           {/* Rest of Leaderboard */}
           {restOfLeaderboard.length > 0 && (
             <>
               {/* Desktop Table */}
-              <Card className="hidden md:block">
-                <CardContent className="p-0">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-16">Rank</TableHead>
-                        <TableHead>User</TableHead>
-                        <TableHead>Tier</TableHead>
-                        <TableHead className="text-right">
-                          {sortBy === "accuracy_rate" ? "Accuracy" :
-                           sortBy === "total_won" ? "Won" :
-                           sortBy === "ethos_credibility" ? "Credibility" : "RepScore"}
-                        </TableHead>
-                        <TableHead className="text-right">Predictions</TableHead>
-                        <TableHead className="text-right">Win Rate</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {restOfLeaderboard.map((user) => (
-                        <LeaderboardRow
-                          key={user.id}
-                          user={user}
-                          sortBy={sortBy}
-                          isCurrentUser={profile?.id === user.id}
-                        />
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <Card className="hidden md:block overflow-hidden">
+                  <CardContent className="p-0">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-muted/50">
+                          <TableHead className="w-16">Rank</TableHead>
+                          <TableHead>User</TableHead>
+                          <TableHead>Tier</TableHead>
+                          <TableHead className="text-right">
+                            {sortBy === "accuracy_rate"
+                              ? "Accuracy"
+                              : sortBy === "total_won"
+                              ? "Won"
+                              : sortBy === "ethos_credibility"
+                              ? "Credibility"
+                              : "RepScore"}
+                          </TableHead>
+                          <TableHead className="text-right">Predictions</TableHead>
+                          <TableHead className="text-right">Win Rate</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {restOfLeaderboard.map((user, index) => (
+                          <LeaderboardRow
+                            key={user.id}
+                            user={user}
+                            sortBy={sortBy}
+                            isCurrentUser={profile?.id === user.id}
+                            index={index}
+                          />
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </motion.div>
 
               {/* Mobile Cards */}
               <div className="md:hidden space-y-3">
-                {restOfLeaderboard.map((user) => (
-                  <LeaderboardMobileCard
+                {restOfLeaderboard.map((user, index) => (
+                  <motion.div
                     key={user.id}
-                    user={user}
-                    sortBy={sortBy}
-                    isCurrentUser={profile?.id === user.id}
-                  />
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 + index * 0.03 }}
+                  >
+                    <LeaderboardMobileCard
+                      user={user}
+                      sortBy={sortBy}
+                      isCurrentUser={profile?.id === user.id}
+                    />
+                  </motion.div>
                 ))}
               </div>
             </>
@@ -231,98 +263,16 @@ export default function LeaderboardPage() {
   );
 }
 
-function PodiumCard({ user, rank, sortBy }: { user: LeaderboardUser; rank: number; sortBy: SortBy }) {
-  const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNTRUSTED");
-
-  const rankStyles = {
-    1: {
-      bg: "bg-gradient-to-b from-yellow-500/20 to-yellow-500/5",
-      border: "border-yellow-500/30",
-      icon: <Crown className="h-6 w-6 text-yellow-500" />,
-      badge: "bg-yellow-500 text-yellow-950",
-    },
-    2: {
-      bg: "bg-gradient-to-b from-slate-400/20 to-slate-400/5",
-      border: "border-slate-400/30",
-      icon: <Medal className="h-5 w-5 text-slate-400" />,
-      badge: "bg-slate-400 text-slate-950",
-    },
-    3: {
-      bg: "bg-gradient-to-b from-amber-600/20 to-amber-600/5",
-      border: "border-amber-600/30",
-      icon: <Medal className="h-5 w-5 text-amber-600" />,
-      badge: "bg-amber-600 text-amber-950",
-    },
-  };
-
-  const style = rankStyles[rank as keyof typeof rankStyles];
-
-  const getValue = () => {
-    switch (sortBy) {
-      case "accuracy_rate":
-        return `${(user.accuracy_rate * 100).toFixed(1)}%`;
-      case "total_won":
-        return user.total_won.toFixed(0);
-      case "ethos_credibility":
-        return user.ethos_credibility.toFixed(0);
-      default:
-        return user.rep_score.toFixed(0);
-    }
-  };
-
-  return (
-    <Card className={cn("relative overflow-hidden", style.bg, style.border)}>
-      <CardContent className="p-3 sm:p-4 text-center">
-        {/* Rank Badge */}
-        <div className="absolute top-2 right-2">
-          <span className={cn("inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold", style.badge)}>
-            {rank}
-          </span>
-        </div>
-
-        {/* Icon */}
-        <div className="flex justify-center mb-2">
-          {style.icon}
-        </div>
-
-        {/* Avatar */}
-        <Avatar className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-2">
-          <AvatarFallback className="text-sm sm:text-base font-semibold">
-            {getInitials(user)}
-          </AvatarFallback>
-        </Avatar>
-
-        {/* Name */}
-        <p className="font-semibold text-xs sm:text-sm truncate mb-1">
-          {getDisplayName(user)}
-        </p>
-
-        {/* Tier */}
-        <Badge
-          variant="outline"
-          className={cn("text-xs mb-2", tierConfig.bgColor, tierConfig.color, tierConfig.borderColor)}
-        >
-          {tierConfig.displayName}
-        </Badge>
-
-        {/* Value */}
-        <p className="text-xl sm:text-2xl font-bold">{getValue()}</p>
-        <p className="text-xs text-muted-foreground">
-          {user.total_predictions} predictions
-        </p>
-      </CardContent>
-    </Card>
-  );
-}
-
 function LeaderboardRow({
   user,
   sortBy,
   isCurrentUser,
+  index,
 }: {
   user: LeaderboardUser;
   sortBy: SortBy;
   isCurrentUser: boolean;
+  index: number;
 }) {
   const tierConfig = getTierConfig((user.tier as CredibilityTier) ?? "UNTRUSTED");
 
@@ -340,19 +290,33 @@ function LeaderboardRow({
   };
 
   return (
-    <TableRow className={isCurrentUser ? "bg-primary/5" : undefined}>
+    <motion.tr
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03 }}
+      className={cn(
+        "transition-colors hover:bg-muted/30",
+        isCurrentUser && "bg-primary/5"
+      )}
+    >
       <TableCell>
-        <span className="text-muted-foreground">{user.rank}</span>
+        <span className="text-muted-foreground font-medium">{user.rank}</span>
       </TableCell>
       <TableCell>
-        <div className="flex items-center gap-2">
-          <Avatar className="w-8 h-8">
-            <AvatarFallback className="text-xs">{getInitials(user)}</AvatarFallback>
+        <div className="flex items-center gap-3">
+          <Avatar className="w-9 h-9 ring-2 ring-background">
+            <AvatarFallback className="text-xs font-semibold bg-primary/10 text-primary">
+              {getInitials(user)}
+            </AvatarFallback>
           </Avatar>
-          <span className="font-mono text-sm">{getDisplayName(user)}</span>
-          {isCurrentUser && (
-            <Badge variant="outline" className="text-xs">You</Badge>
-          )}
+          <div>
+            <span className="font-medium text-sm">{getDisplayName(user)}</span>
+            {isCurrentUser && (
+              <Badge variant="outline" className="ml-2 text-xs">
+                You
+              </Badge>
+            )}
+          </div>
         </div>
       </TableCell>
       <TableCell>
@@ -363,16 +327,29 @@ function LeaderboardRow({
           {tierConfig.displayName}
         </Badge>
       </TableCell>
-      <TableCell className="text-right font-semibold">{getValue()}</TableCell>
+      <TableCell className="text-right font-semibold font-mono">
+        {getValue()}
+      </TableCell>
       <TableCell className="text-right text-muted-foreground">
         {user.total_predictions}
       </TableCell>
-      <TableCell className="text-right text-muted-foreground">
-        {user.total_predictions > 0
-          ? `${((user.correct_predictions / user.total_predictions) * 100).toFixed(0)}%`
-          : "-"}
+      <TableCell className="text-right">
+        <span
+          className={cn(
+            "font-medium",
+            user.accuracy_rate >= 0.6
+              ? "text-emerald-600 dark:text-emerald-400"
+              : user.accuracy_rate >= 0.4
+              ? "text-amber-600 dark:text-amber-400"
+              : "text-red-600 dark:text-red-400"
+          )}
+        >
+          {user.total_predictions > 0
+            ? `${((user.correct_predictions / user.total_predictions) * 100).toFixed(0)}%`
+            : "-"}
+        </span>
       </TableCell>
-    </TableRow>
+    </motion.tr>
   );
 }
 
@@ -405,29 +382,38 @@ function LeaderboardMobileCard({
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-8 h-8 text-muted-foreground font-medium">
+            <span className="inline-flex items-center justify-center w-8 h-8 text-muted-foreground font-medium text-sm">
               {user.rank}
             </span>
-            <Avatar className="w-10 h-10">
-              <AvatarFallback>{getInitials(user)}</AvatarFallback>
+            <Avatar className="w-10 h-10 ring-2 ring-background">
+              <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                {getInitials(user)}
+              </AvatarFallback>
             </Avatar>
             <div>
               <div className="flex items-center gap-2">
-                <p className="font-mono text-sm font-medium">{getDisplayName(user)}</p>
+                <p className="font-medium text-sm">{getDisplayName(user)}</p>
                 {isCurrentUser && (
-                  <Badge variant="outline" className="text-xs">You</Badge>
+                  <Badge variant="outline" className="text-xs">
+                    You
+                  </Badge>
                 )}
               </div>
               <Badge
                 variant="outline"
-                className={cn("mt-1 text-xs", tierConfig.bgColor, tierConfig.color, tierConfig.borderColor)}
+                className={cn(
+                  "mt-1 text-xs",
+                  tierConfig.bgColor,
+                  tierConfig.color,
+                  tierConfig.borderColor
+                )}
               >
                 {tierConfig.displayName}
               </Badge>
             </div>
           </div>
           <div className="text-right">
-            <p className="text-xl font-bold">{getValue()}</p>
+            <p className="text-xl font-bold font-mono">{getValue()}</p>
           </div>
         </div>
 
@@ -438,7 +424,16 @@ function LeaderboardMobileCard({
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">Win Rate</p>
-            <p className="font-semibold">
+            <p
+              className={cn(
+                "font-semibold",
+                user.accuracy_rate >= 0.6
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : user.accuracy_rate >= 0.4
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-red-600 dark:text-red-400"
+              )}
+            >
               {user.total_predictions > 0
                 ? `${((user.correct_predictions / user.total_predictions) * 100).toFixed(0)}%`
                 : "-"}
@@ -446,7 +441,7 @@ function LeaderboardMobileCard({
           </div>
           <div>
             <p className="text-xs text-muted-foreground mb-1">RepScore</p>
-            <p className="font-semibold">{user.rep_score.toFixed(0)}</p>
+            <p className="font-semibold font-mono">{user.rep_score.toFixed(0)}</p>
           </div>
         </div>
       </CardContent>
@@ -459,16 +454,16 @@ function LeaderboardSkeleton() {
     <div className="space-y-6">
       {/* Podium Skeleton */}
       <div className="grid grid-cols-3 gap-4">
-        <Skeleton className="h-48 pt-8" />
-        <Skeleton className="h-56" />
-        <Skeleton className="h-44 pt-12" />
+        <Skeleton className="h-40 sm:h-48 pt-8 rounded-xl" />
+        <Skeleton className="h-48 sm:h-56 rounded-xl" />
+        <Skeleton className="h-36 sm:h-44 pt-12 rounded-xl" />
       </div>
 
       {/* Table Skeleton */}
       <Card>
         <CardContent className="p-4 space-y-4">
           {[...Array(7)].map((_, i) => (
-            <Skeleton key={i} className="h-12 w-full" />
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
           ))}
         </CardContent>
       </Card>
