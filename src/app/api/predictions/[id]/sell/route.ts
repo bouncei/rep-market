@@ -105,11 +105,12 @@ export async function POST(
     }
 
     // Calculate sell value using AMM pricing
+    const virtualYes = market.virtual_stake_yes ?? 1000;
+    const virtualNo = market.virtual_stake_no ?? 1000;
     const totalLiquidity =
       (market.total_stake_yes ?? 0) +
-      (market.total_stake_no ?? 0) +
-      (market.virtual_stake_yes ?? 100) +
-      (market.virtual_stake_no ?? 100);
+      (market.total_stake_no ?? 0);
+    const virtualLiquidity = virtualYes + virtualNo;
 
     const currentProbYes = market.raw_probability_yes ?? 0.5;
 
@@ -118,7 +119,8 @@ export async function POST(
       stake: prediction.stake_amount,
       currentProbYes,
       totalLiquidity,
-      fee: 0.02,
+      virtualLiquidity,
+      fee: 0.005, // 0.5% exit fee
     });
 
     const repScoreDelta = calculateRepScoreDelta(
@@ -135,8 +137,8 @@ export async function POST(
       prediction.position as "YES" | "NO",
       prediction.stake_amount,
       prediction.weighted_stake,
-      market.virtual_stake_yes ?? 100,
-      market.virtual_stake_no ?? 100
+      virtualYes,
+      virtualNo
     );
 
     // Start transaction-like updates
@@ -226,6 +228,7 @@ export async function POST(
           priceImpact: sellResult.priceImpact,
           fee: sellResult.fee,
           netValue: sellResult.netValue,
+          effectiveSlippagePercent: sellResult.effectiveSlippagePercent,
         },
         profitLoss: {
           amount: sellResult.profitLoss,
@@ -290,11 +293,12 @@ export async function GET(
     const market = prediction.market as any;
 
     // Calculate sell value preview
+    const virtualYes = market.virtual_stake_yes ?? 1000;
+    const virtualNo = market.virtual_stake_no ?? 1000;
     const totalLiquidity =
       (market.total_stake_yes ?? 0) +
-      (market.total_stake_no ?? 0) +
-      (market.virtual_stake_yes ?? 100) +
-      (market.virtual_stake_no ?? 100);
+      (market.total_stake_no ?? 0);
+    const virtualLiquidity = virtualYes + virtualNo;
 
     const currentProbYes = market.raw_probability_yes ?? 0.5;
 
@@ -303,7 +307,8 @@ export async function GET(
       stake: prediction.stake_amount,
       currentProbYes,
       totalLiquidity,
-      fee: 0.02,
+      virtualLiquidity,
+      fee: 0.005, // 0.5% exit fee
     });
 
     const canSell = market.status === "OPEN";
@@ -320,6 +325,7 @@ export async function GET(
           priceImpact: sellResult.priceImpact,
           fee: sellResult.fee,
           netValue: sellResult.netValue,
+          effectiveSlippagePercent: sellResult.effectiveSlippagePercent,
         },
         profitLoss: {
           amount: sellResult.profitLoss,
@@ -327,6 +333,9 @@ export async function GET(
         },
         canSell,
         marketStatus: market.status,
+        warning: sellResult.effectiveSlippagePercent > 2 
+          ? `High slippage warning: This trade will incur ${sellResult.effectiveSlippagePercent.toFixed(1)}% in fees and price impact due to low market liquidity.`
+          : null,
       },
     });
   } catch (error) {

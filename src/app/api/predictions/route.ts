@@ -263,8 +263,8 @@ async function recalculateMarketProbabilities(
     .eq("id", marketId)
     .single();
 
-  const virtualYes = marketData?.virtual_stake_yes ?? 100;
-  const virtualNo = marketData?.virtual_stake_no ?? 100;
+  const virtualYes = marketData?.virtual_stake_yes ?? 1000;
+  const virtualNo = marketData?.virtual_stake_no ?? 1000;
 
   // Get all predictions for this market
   const { data: predictions, error } = await supabase

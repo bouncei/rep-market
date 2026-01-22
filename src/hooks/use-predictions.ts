@@ -54,6 +54,7 @@ interface SellPredictionResult {
       priceImpact: number;
       fee: number;
       netValue: number;
+      effectiveSlippagePercent?: number;
     };
     profitLoss: {
       amount: number;
@@ -79,6 +80,7 @@ export interface SellPreview {
     priceImpact: number;
     fee: number;
     netValue: number;
+    effectiveSlippagePercent?: number;
   };
   profitLoss: {
     amount: number;
@@ -86,6 +88,7 @@ export interface SellPreview {
   };
   canSell: boolean;
   marketStatus: string;
+  warning?: string | null;
 }
 
 export function usePredictions(marketId?: string) {

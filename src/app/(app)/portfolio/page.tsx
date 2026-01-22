@@ -33,6 +33,7 @@ import {
   ExternalLink,
   DollarSign,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -613,6 +614,20 @@ function PredictionCard({ prediction, onSell, getSellPreview, isSellingPredictio
             </div>
           ) : sellPreview ? (
             <div className="space-y-4">
+              {/* High Slippage Warning */}
+              {sellPreview.sellValue.effectiveSlippagePercent && sellPreview.sellValue.effectiveSlippagePercent > 2 && (
+                <div className="rounded-lg border border-orange-500/30 bg-orange-500/5 p-3 flex gap-3">
+                  <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+                  <div className="space-y-1 text-sm">
+                    <p className="font-medium text-orange-500">High Slippage Warning</p>
+                    <p className="text-muted-foreground">
+                      This trade will incur {sellPreview.sellValue.effectiveSlippagePercent.toFixed(1)}% in total costs (fees + price impact)
+                      due to current market liquidity. More participants will improve pricing stability.
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-lg border p-4 space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Position</span>
@@ -645,7 +660,7 @@ function PredictionCard({ prediction, onSell, getSellPreview, isSellingPredictio
                   <span className="text-orange-500">-{sellPreview.sellValue.priceImpact.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Fee (2%)</span>
+                  <span className="text-muted-foreground">Exit Fee (0.5%)</span>
                   <span className="text-orange-500">-{sellPreview.sellValue.fee.toFixed(2)}</span>
                 </div>
                 <Separator />
